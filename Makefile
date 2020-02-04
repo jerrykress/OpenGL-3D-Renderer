@@ -1,4 +1,4 @@
-PROJECT_NAME = color_scale
+PROJECT_NAME = week2
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp
