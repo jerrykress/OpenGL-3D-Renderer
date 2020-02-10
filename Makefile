@@ -1,4 +1,4 @@
-PROJECT_NAME = week2
+PROJECT_NAME = filled_triangle
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp

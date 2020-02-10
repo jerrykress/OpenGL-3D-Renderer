@@ -19,14 +19,36 @@ void stroke_triangle(CanvasTriangle triangle);
 void draw(Colour line_colour, CanvasPoint start, CanvasPoint end);
 void filled_triangle(CanvasTriangle triangle);
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
-void colored_triangle(CanvasPoint intersection, CanvasPoint left, CanvasPoint right);
+void colored_triangle(CanvasPoint intersection, CanvasPoint left, CanvasPoint right, Colour color);
+void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color);
+void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color);
 void update();
 int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
 void handleEvent(SDL_Event event);
-glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
+
+glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap)
+{
+    glm::vec3 *answer = new glm::vec3[gap];
+    double step1 = (b[0] - a[0]) / (gap - 1);
+    double step2 = (b[1] - a[1]) / (gap - 1);
+    double step3 = (b[2] - a[2]) / (gap - 1);
+
+    // first value and last value
+    answer[0] = a;
+    answer[gap - 1] = b;
+    for (int i = 1; i < gap - 1; i++)
+    {
+        double val1 = a[0] + (i * step1);
+        double val2 = a[1] + (i * step2);
+        double val3 = a[2] + (i * step3);
+        glm::vec3 temp = glm::vec3(val1, val2, val3);
+        answer[i] = temp;
+    }
+    return answer;
+}
 
 int main(int argc, char *argv[])
 {
@@ -36,16 +58,6 @@ int main(int argc, char *argv[])
         // We MUST poll for events - otherwise the window will freeze !
         if (window.pollForInputEvents(&event))
             handleEvent(event);
-        // if (event.type == SDL_KEYUP)
-        // {
-        //     Colour line_colour = Colour(255, 255, 255);
-        //     CanvasPoint a = CanvasPoint(float(rand()%320), float(rand()%240));
-        //     CanvasPoint b = CanvasPoint(float(rand()%320), float(rand()%240));
-        //     CanvasPoint c = CanvasPoint(float(rand()%320), float(rand()%240));
-
-        //     CanvasTriangle triangle = CanvasTriangle(a, b, c, line_colour);
-        //     stroke_triangle(triangle);
-        // }
         update();
         Colour line_colour = Colour(255, 0, 0);
         CanvasPoint end = CanvasPoint(150.0, 150.0);
@@ -60,25 +72,13 @@ void draw(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {
     // window.clearPixels();
     // draw_line(line_colour, start, end);
-    CanvasPoint a = CanvasPoint(150.0, 100.0);
-    CanvasPoint b = CanvasPoint(20.0, 20.0);
-    CanvasPoint c = CanvasPoint(60.0, 80.0);
+    CanvasPoint a = CanvasPoint(300.0, 200.0);
+    CanvasPoint b = CanvasPoint(10.0, 10.0);
+    CanvasPoint c = CanvasPoint(60.0, 70.0);
 
     CanvasTriangle triangle = CanvasTriangle(a, b, c, line_colour);
     stroke_triangle(triangle);
     filled_triangle(triangle);
-
-    //   for (int y = 0; y < window.height; y++)
-    //   {
-    //     for (int x = 0; x < window.width; x++)
-    //     {
-    //       float red = rand() % 255;
-    //       float green = 0.0;
-    //       float blue = 0.0;
-    //       uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-    //       window.setPixelColour(x, y, colour);
-    //     }
-    //   }
 }
 void stroke_triangle(CanvasTriangle triangle)
 {
@@ -131,90 +131,61 @@ void filled_triangle(CanvasTriangle triangle)
         }
     }
     CanvasPoint middlePoint = triangle.vertices[index_middle];
-    //interpolation
-    // http://www.hugi.scene.org/online/coding/hugi%2017%20-%20cotriang.htm
-    float t = (middlePoint.y - top.y) / (bottom.y - top.y);
-    float d_x = top.x + (t * (bottom.x - top.x));
-    CanvasPoint intersectedPoint = CanvasPoint(d_x, middlePoint.y);
-
-    //test to draw triangles
-    CanvasTriangle top_tri = CanvasTriangle(top, intersectedPoint, middlePoint);
-    CanvasTriangle bottom_tri = CanvasTriangle(bottom, middlePoint, intersectedPoint);
-
-    // stroke_triangle(top_tri);
-    // stroke_triangle(bottom_tri);
-
-    //draw the top one
-    colored_triangle(top, middlePoint, intersectedPoint);
-    // //draw the bottom one
-    colored_triangle(bottom, middlePoint, intersectedPoint);
+    Colour tri_color = Colour(255, 255, 255);
+    colored_triangle(top, middlePoint, bottom, tri_color);
 }
-void colored_triangle(CanvasPoint intersection, CanvasPoint left, CanvasPoint right)
+void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
-    if (left.x > right.x)
+    float invslope1 = (v2.x - v1.x) / (v2.y - v1.y);
+    float invslope2 = (v3.x - v1.x) / (v3.y - v1.y);
+
+    float curx1 = v1.x;
+    float curx2 = v1.x;
+
+    for (int scanlineY = v1.y; scanlineY <= v2.y; scanlineY++)
     {
-        CanvasPoint temp = left;
-        left = right;
-        right = temp;
+        CanvasPoint start = CanvasPoint(int(curx1), round(scanlineY));
+        CanvasPoint end = CanvasPoint(int(curx2), round(scanlineY));
+        draw_line(color, start, end);
+        curx1 += invslope1;
+        curx2 += invslope2;
     }
+}
+void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
+{
+    float invslope1 = (v3.x - v1.x) / (v3.y - v1.y);
+    float invslope2 = (v3.x - v2.x) / (v3.y - v2.y);
 
-    //draw left line first
-    float start_x = intersection.x;
-    float start_y = intersection.y;
-    float end_x = left.x;
-    float end_y = left.y;
-    if (intersection.y > left.y)
+    float curx1 = v3.x;
+    float curx2 = v3.x;
+
+    for (int scanlineY = v3.y; scanlineY > v1.y; scanlineY--)
     {
-        start_x = left.x;
-        start_y = left.y;
-        end_x = intersection.x;
-        end_y = intersection.y;
+        CanvasPoint start = CanvasPoint(int(curx1), round(scanlineY));
+        CanvasPoint end = CanvasPoint(int(curx2), round(scanlineY));
+        draw_line(color, start, end);
+        curx1 -= invslope1;
+        curx2 -= invslope2;
     }
-
-    float xDiff = end_x - start_x;
-    float yDiff = end_y - start_y;
-    float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
-    float xStepSize = xDiff / numberOfSteps;
-    float yStepSize = yDiff / numberOfSteps;
-
-    float start_right_x = intersection.x;
-    float start_right_y = intersection.y;
-    float end_right_x = right.x;
-    float end_right_y = right.y;
-
-    if (intersection.y > right.y)
+}
+void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
+{
+    if (vt2.y == vt3.y)
     {
-        start_right_x = right.x;
-        start_right_y = right.y;
-        end_right_x = intersection.x;
-        end_right_y = intersection.y;
+        fillBottomFlatTriangle(vt1, vt2, vt3, color);
     }
-
-    //calculate point for right side
-    float right_xDiff = end_right_x - start_right_x;
-    float right_yDiff = end_right_y - start_right_y;
-    float right_numberOfSteps = std::max(abs(right_xDiff), abs(right_yDiff));
-    float right_yStepSize = right_yDiff / right_numberOfSteps;
-    float right_xStepSize = right_xDiff / right_numberOfSteps;
-    //in each iteration it must draw the left line, then draw until the right
-    for (float i = 0.0; i < numberOfSteps; i++)
+    else if (vt1.y == vt2.y)
     {
-        float x = start_x + (xStepSize * i);
-        float y = start_y + (yStepSize * i);
-        float right_y = start_right_y + (right_yStepSize * i);
-        float right_x = start_right_x + (right_xStepSize * i);
-
-        float red = 255;
-        float green = 255;
-        float blue = 255;
-        uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-        // for (float j = x; j < right_x + 1; j++)
-        // {
-        //     window.setPixelColour(round(j), round(y), colour);
-        // }
-        window.setPixelColour(round(right_x), round(right_y), colour);
-        window.setPixelColour(round(x), round(y), colour);
+        fillTopFlatTriangle(vt1, vt2, vt3, color);
     }
+    else
+    {
+        CanvasPoint v4 = CanvasPoint(
+            (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))), vt2.y);
+        fillBottomFlatTriangle(vt1, vt2, v4, color);
+        fillTopFlatTriangle(vt2, v4, vt3, color);
+    }
+    draw_line(color, vt1, vt3);
 }
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {
