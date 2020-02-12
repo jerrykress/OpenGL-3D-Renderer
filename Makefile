@@ -1,4 +1,4 @@
-PROJECT_NAME = display_ppm
+PROJECT_NAME = display_ppm_v2
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp
