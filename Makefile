@@ -1,4 +1,4 @@
-PROJECT_NAME = display_ppm_v2
+PROJECT_NAME = triangle_texture
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp
