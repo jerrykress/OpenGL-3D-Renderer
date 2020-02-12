@@ -1,4 +1,4 @@
-PROJECT_NAME = filled_triangle
+PROJECT_NAME = display_ppm
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp

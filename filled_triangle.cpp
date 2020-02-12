@@ -72,9 +72,9 @@ void draw(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {
     // window.clearPixels();
     // draw_line(line_colour, start, end);
-    CanvasPoint a = CanvasPoint(300.0, 200.0);
-    CanvasPoint b = CanvasPoint(10.0, 10.0);
-    CanvasPoint c = CanvasPoint(60.0, 70.0);
+    CanvasPoint a = CanvasPoint(200.0, 120.0);
+    CanvasPoint b = CanvasPoint(10.0, 50.0);
+    CanvasPoint c = CanvasPoint(100.0, 80.0);
 
     CanvasTriangle triangle = CanvasTriangle(a, b, c, line_colour);
     stroke_triangle(triangle);
