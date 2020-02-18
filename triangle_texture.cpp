@@ -24,7 +24,9 @@ void texture_colored_triangle(CanvasPoint intersection, CanvasPoint left, Canvas
 void texture_fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, vector<vector<Colour>> rgb_values);
 void texture_fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, vector<vector<Colour>> rgb_values);
 glm::vec3 *scaled_coordinates(CanvasPoint start, CanvasPoint end);
-void fill_from_ppm(CanvasPoint start, CanvasPoint end, vector<vector<Colour>> rgb_values);
+int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint intersection);
+void fill_from_ppm(CanvasPoint start, CanvasPoint end, CanvasPoint start_pixel, CanvasPoint end_pixel, vector<vector<Colour>> rgb_values);
+// void fill_from_ppm(CanvasPoint start, CanvasPoint end, vector<vector<Colour>> rgb_values);
 void update();
 int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
@@ -61,8 +63,6 @@ glm::vec3 *scaled_coordinates(CanvasPoint start, CanvasPoint end)
     float xDiff = end.x - start.x;
     float yDiff = end.y - start.y;
     float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
-    float xStepSize = xDiff / numberOfSteps;
-    float yStepSize = yDiff / numberOfSteps;
 
     glm::vec3 *answer = new glm::vec3[int(numberOfSteps)];
     answer = interpolate(point_a, point_b, round(numberOfSteps));
@@ -183,71 +183,123 @@ void texture_filled_triangle(CanvasTriangle triangle, vector<vector<Colour>> rgb
     Colour tri_color = Colour(255, 255, 255);
     texture_colored_triangle(top, middlePoint, bottom, rgb_values);
 }
+int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint intersection)
+{
+    float xDiff = endpoint1.x - intersection.x;
+    float yDiff = endpoint1.y - intersection.y;
+    float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
+
+    float xDiff2 = endpoint2.x - intersection.x;
+    float yDiff2 = endpoint2.y - intersection.y;
+    float numberOfSteps2 = std::max(abs(xDiff2), abs(yDiff2));
+
+    if (numberOfSteps2 > numberOfSteps)
+    {
+        return round(numberOfSteps2);
+    }
+    else
+    {
+        return round(numberOfSteps);
+    }
+}
+
 // change all of this
 void texture_fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, vector<vector<Colour>> rgb_values)
 {
-    float invslope1 = (v2.x - v1.x) / (v2.y - v1.y);
-    float invslope2 = (v3.x - v1.x) / (v3.y - v1.y);
+    // interpolate(glm::vec3 a, glm::vec3 b, int gap)
+    int gap = calculate_gap(v2, v3, v1);
+    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
+    glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
 
-    float curx1 = v1.x;
-    float curx2 = v1.x;
+    glm::vec3 *answer_left = new glm::vec3[gap];
+    answer_left = interpolate(from, to, gap);
 
-    for (int scanlineY = v1.y; scanlineY <= v2.y; scanlineY++)
+    to = glm::vec3(v3.x, v3.y, 1);
+    glm::vec3 *answer_right = new glm::vec3[gap];
+    answer_right = interpolate(from, to, gap);
+
+    glm::vec3 *left_rgb = new glm::vec3[gap];
+    from = glm::vec3(v1.texturePoint.x, v1.texturePoint.y, 1);
+    to = glm::vec3(v2.texturePoint.x, v2.texturePoint.y, 1);
+    left_rgb = interpolate(from, to, gap);
+
+    glm::vec3 *right_rgb = new glm::vec3[gap];
+    to = glm::vec3(v3.texturePoint.x, v3.texturePoint.y, 1);
+    left_rgb = interpolate(from, to, gap);
+
+    for (int i = 0; i < gap; i++)
     {
-        // CanvasPoint start = CanvasPoint(int(curx1), round(scanlineY));
-        // CanvasPoint end = CanvasPoint(int(curx2), round(scanlineY));
-        // fill_from_ppm(start, end, rgb_values);
-        curx1 += invslope1;
-        curx2 += invslope2;
+        CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
+        CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
+        CanvasPoint start_pixel = CanvasPoint(int(left_rgb[i][0]), round(left_rgb[i][1]));
+        CanvasPoint end_pixel = CanvasPoint(int(right_rgb[i][0]), round(right_rgb[i][1]));
+        fill_from_ppm(start, end, start_pixel, end_pixel, rgb_values);
     }
 }
 // change all of this
 
 void texture_fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, vector<vector<Colour>> rgb_values)
 {
-    float invslope1 = (v3.x - v1.x) / (v3.y - v1.y);
-    float invslope2 = (v3.x - v2.x) / (v3.y - v2.y);
 
-    float curx1 = v3.x;
-    float curx2 = v3.x;
+    // interpolate(glm::vec3 a, glm::vec3 b, int gap)
+    int gap = calculate_gap(v2, v3, v1);
+    glm::vec3 from = glm::vec3(v3.x, v3.y, 1);
+    glm::vec3 to = glm::vec3(v1.x, v1.y, 1);
 
-    glm::vec3 *v1_to_v3 = scaled_coordinates(v1, v3);
-    glm::vec3 *v2_to_v3 = scaled_coordinates(v2, v3);
+    glm::vec3 *answer_left = new glm::vec3[gap];
+    answer_left = interpolate(from, to, gap);
 
-    for (int scanlineY = v3.y; scanlineY > v1.y; scanlineY--)
+    to = glm::vec3(v2.x, v2.y, 1);
+    glm::vec3 *answer_right = new glm::vec3[gap];
+    answer_right = interpolate(from, to, gap);
+
+    glm::vec3 *left_rgb = new glm::vec3[gap];
+    from = glm::vec3(v3.texturePoint.x, v3.texturePoint.y, 1);
+    to = glm::vec3(v1.texturePoint.x, v1.texturePoint.y, 1);
+    left_rgb = interpolate(from, to, gap);
+
+    glm::vec3 *right_rgb = new glm::vec3[gap];
+    to = glm::vec3(v2.texturePoint.x, v2.texturePoint.y, 1);
+    left_rgb = interpolate(from, to, gap);
+
+    for (int i = 0; i < gap; i++)
     {
-        CanvasPoint start = CanvasPoint(int(curx1), round(scanlineY));
-        CanvasPoint end = CanvasPoint(int(curx2), round(scanlineY));
-        // fill_from_ppm(start, end, rgb_values);
-        curx1 -= invslope1;
-        curx2 -= invslope2;
+        CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
+        CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
+        CanvasPoint start_pixel = CanvasPoint(int(left_rgb[i][0]), round(left_rgb[i][1]));
+        CanvasPoint end_pixel = CanvasPoint(int(right_rgb[i][0]), round(right_rgb[i][1]));
+        fill_from_ppm(start, end, start_pixel, end_pixel, rgb_values);
     }
 }
-void fill_from_ppm(CanvasPoint start, CanvasPoint end, vector<vector<Colour>> rgb_values)
+void fill_from_ppm(CanvasPoint start, CanvasPoint end, CanvasPoint start_pixel, CanvasPoint end_pixel, vector<vector<Colour>> rgb_values)
 {
     //3 interpolations
-    glm::vec3 point_a = glm::vec3(start.texturePoint.x, start.texturePoint.y, 0);
-    glm::vec3 point_b = glm::vec3(end.texturePoint.x, end.texturePoint.y, 0);
-
     float xDiff = end.x - start.x;
     float yDiff = end.y - start.y;
     float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
-    float xStepSize = xDiff / numberOfSteps;
-    float yStepSize = yDiff / numberOfSteps;
-
-    glm::vec3 *answer = new glm::vec3[int(numberOfSteps)];
-    answer = interpolate(point_a, point_b, round(numberOfSteps));
-    int tx_index = 0;
-    for (float i = 0.0; i < numberOfSteps; i++)
+    if (numberOfSteps != 0)
     {
-        float x = start.x + (xStepSize * i);
-        float y = start.y + (yStepSize * i);
-        float red = rgb_values[round(answer[tx_index][0])][round(answer[tx_index][1])].red;
-        float green = rgb_values[round(answer[tx_index][0])][round(answer[tx_index][1])].green;
-        float blue = rgb_values[round(answer[tx_index][0])][round(answer[tx_index][1])].blue;
-        tx_index++;
-        uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-        window.setPixelColour(round(x), round(y), colour);
+        float xStepSize = xDiff / numberOfSteps;
+        float yStepSize = yDiff / numberOfSteps;
+
+        float pixel_xDiff = end_pixel.x - start_pixel.x;
+        float pixel_yDiff = end_pixel.y - start_pixel.y;
+        float pixel_numberOfSteps = std::max(abs(pixel_xDiff), abs(pixel_yDiff));
+        float pixel_xStepSize = pixel_xDiff / pixel_numberOfSteps;
+        float pixel_yStepSize = pixel_yDiff / pixel_numberOfSteps;
+
+        for (float i = 0.0; i < numberOfSteps; i++)
+        {
+            float x = start.x + (xStepSize * i);
+            float y = start.y + (yStepSize * i);
+            float tx_index = start_pixel.x + (pixel_xStepSize * i);
+            float ty_index = start_pixel.y + (pixel_yStepSize * i);
+            float red = rgb_values[round(tx_index)][round(ty_index)].red;
+            float green = rgb_values[round(tx_index)][round(ty_index)].green;
+            float blue = rgb_values[round(tx_index)][round(ty_index)].blue;
+            uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
+            window.setPixelColour(round(x), round(y), colour);
+        }
     }
 }
 void texture_colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, vector<vector<Colour>> rgb_values)
@@ -269,7 +321,7 @@ void texture_colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3,
         texture_fillBottomFlatTriangle(vt1, vt2, v4, rgb_values);
         texture_fillTopFlatTriangle(vt2, v4, vt3, rgb_values);
     }
-    fill_from_ppm(vt1, vt3, rgb_values);
+    // fill_from_ppm(vt1, vt3, rgb_values);
 }
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {

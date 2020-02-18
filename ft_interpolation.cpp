@@ -22,7 +22,6 @@ void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
 void colored_triangle(CanvasPoint intersection, CanvasPoint left, CanvasPoint right, Colour color);
 void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color);
 void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color);
-int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint intersection);
 void update();
 int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
@@ -73,9 +72,9 @@ void draw(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {
     // window.clearPixels();
     // draw_line(line_colour, start, end);
-    CanvasPoint a = CanvasPoint(160.0, 10.0);
-    CanvasPoint b = CanvasPoint(300.0, 230.0);
-    CanvasPoint c = CanvasPoint(10.0, 150.0);
+    CanvasPoint a = CanvasPoint(200.0, 120.0);
+    CanvasPoint b = CanvasPoint(10.0, 50.0);
+    CanvasPoint c = CanvasPoint(100.0, 80.0);
 
     CanvasTriangle triangle = CanvasTriangle(a, b, c, line_colour);
     stroke_triangle(triangle);
@@ -135,68 +134,39 @@ void filled_triangle(CanvasTriangle triangle)
     Colour tri_color = Colour(255, 255, 255);
     colored_triangle(top, middlePoint, bottom, tri_color);
 }
-int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint intersection)
-{
-    float xDiff = endpoint1.x - intersection.x;
-    float yDiff = endpoint1.y - intersection.y;
-    float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
-
-    float xDiff2 = endpoint2.x - intersection.x;
-    float yDiff2 = endpoint2.y - intersection.y;
-    float numberOfSteps2 = std::max(abs(xDiff2), abs(yDiff2));
-
-    if (numberOfSteps2 > numberOfSteps)
-    {
-        return round(numberOfSteps2);
-    }
-    else
-    {
-        return round(numberOfSteps);
-    }
-}
-// http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html source 
 void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
-    // interpolate(glm::vec3 a, glm::vec3 b, int gap)
-    int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
-    glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
+    float invslope1 = (v2.x - v1.x) / (v2.y - v1.y);
+    float invslope2 = (v3.x - v1.x) / (v3.y - v1.y);
 
-    glm::vec3 *answer_left = new glm::vec3[gap];
-    answer_left = interpolate(from, to, gap);
+    float curx1 = v1.x;
+    float curx2 = v1.x;
 
-    to = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 *answer_right = new glm::vec3[gap];
-    answer_right = interpolate(from, to, gap);
-
-    for (int i = 0; i < gap; i++)
+    for (int scanlineY = v1.y; scanlineY <= v2.y; scanlineY++)
     {
-        CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
-        CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
+        CanvasPoint start = CanvasPoint(int(curx1), round(scanlineY));
+        CanvasPoint end = CanvasPoint(int(curx2), round(scanlineY));
         draw_line(color, start, end);
+        curx1 += invslope1;
+        curx2 += invslope2;
     }
 }
 void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
-    // interpolate(glm::vec3 a, glm::vec3 b, int gap)
-    int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 to = glm::vec3(v1.x, v1.y, 1);
+    float invslope1 = (v3.x - v1.x) / (v3.y - v1.y);
+    float invslope2 = (v3.x - v2.x) / (v3.y - v2.y);
 
-    glm::vec3 *answer_left = new glm::vec3[gap];
-    answer_left = interpolate(from, to, gap);
+    float curx1 = v3.x;
+    float curx2 = v3.x;
 
-    to = glm::vec3(v2.x, v2.y, 1);
-    glm::vec3 *answer_right = new glm::vec3[gap];
-    answer_right = interpolate(from, to, gap);
-
-    for (int i = 0; i < gap; i++)
+    for (int scanlineY = v3.y; scanlineY > v1.y; scanlineY--)
     {
-        CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
-        CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
+        CanvasPoint start = CanvasPoint(int(curx1), round(scanlineY));
+        CanvasPoint end = CanvasPoint(int(curx2), round(scanlineY));
         draw_line(color, start, end);
+        curx1 -= invslope1;
+        curx2 -= invslope2;
     }
-
 }
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
 {
