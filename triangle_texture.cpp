@@ -225,7 +225,7 @@ void texture_fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint 
 
     glm::vec3 *right_rgb = new glm::vec3[gap];
     to = glm::vec3(v3.texturePoint.x, v3.texturePoint.y, 1);
-    left_rgb = interpolate(from, to, gap);
+    right_rgb = interpolate(from, to, gap);
 
     for (int i = 0; i < gap; i++)
     {
@@ -243,24 +243,24 @@ void texture_fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3,
 
     // interpolate(glm::vec3 a, glm::vec3 b, int gap)
     int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 to = glm::vec3(v1.x, v1.y, 1);
+    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
+    glm::vec3 to = glm::vec3(v3.x, v3.y, 1);
 
     glm::vec3 *answer_left = new glm::vec3[gap];
     answer_left = interpolate(from, to, gap);
 
-    to = glm::vec3(v2.x, v2.y, 1);
+    from = glm::vec3(v2.x, v2.y, 1);
     glm::vec3 *answer_right = new glm::vec3[gap];
     answer_right = interpolate(from, to, gap);
 
     glm::vec3 *left_rgb = new glm::vec3[gap];
-    from = glm::vec3(v3.texturePoint.x, v3.texturePoint.y, 1);
-    to = glm::vec3(v1.texturePoint.x, v1.texturePoint.y, 1);
+    to = glm::vec3(v3.texturePoint.x, v3.texturePoint.y, 1);
+    from = glm::vec3(v1.texturePoint.x, v1.texturePoint.y, 1);
     left_rgb = interpolate(from, to, gap);
 
     glm::vec3 *right_rgb = new glm::vec3[gap];
-    to = glm::vec3(v2.texturePoint.x, v2.texturePoint.y, 1);
-    left_rgb = interpolate(from, to, gap);
+    from = glm::vec3(v2.texturePoint.x, v2.texturePoint.y, 1);
+    right_rgb = interpolate(from, to, gap);
 
     for (int i = 0; i < gap; i++)
     {
@@ -316,7 +316,39 @@ void texture_colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3,
     {
         CanvasPoint v4 = CanvasPoint(
             (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))), vt2.y);
-        TexturePoint t_v4 = TexturePoint(vt1.texturePoint.x + (((vt2.texturePoint.y - vt1.texturePoint.y) / (vt3.texturePoint.y - vt1.texturePoint.y)) * (vt3.texturePoint.x - vt1.texturePoint.x)), vt2.texturePoint.y);
+        // TexturePoint t_v4 = TexturePoint((vt1.texturePoint.x + (((vt2.texturePoint.y - vt1.texturePoint.y) / (vt3.texturePoint.y - vt1.texturePoint.y)) * (vt3.texturePoint.x - vt1.texturePoint.x))), vt2.texturePoint.y);
+        // interpolate the proportion
+        float proportion = (v4.y - vt1.y) / (vt3.y - v4.y);
+        float v4_texture_y = 0.0;
+        float v4_texture_x = 0.0;
+        for (float j = vt1.texturePoint.y; j < vt3.texturePoint.y; j++)
+        {
+            float find = roundf((j - vt1.texturePoint.y) / (vt3.texturePoint.y - j));
+            if (find == roundf(proportion))
+            {
+                v4_texture_y = j;
+            }
+        }
+
+        float xDiff = vt3.texturePoint.x - vt1.texturePoint.x;
+        float yDiff = vt3.texturePoint.y - vt1.texturePoint.y;
+        float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
+        int gap = round(numberOfSteps);
+        glm::vec3 from = glm::vec3(vt1.texturePoint.x, vt1.texturePoint.y, 1);
+        glm::vec3 to = glm::vec3(vt3.texturePoint.x, vt3.texturePoint.y, 1);
+        glm::vec3 *v4_line_values = new glm::vec3[gap];
+        v4_line_values = interpolate(from, to, gap);
+        for (int i = 0; i < gap; i++)
+        {
+            // std::cout << i << "\n";
+            if (round(v4_line_values[i][1]) == round(v4_texture_y))
+            {
+                v4_texture_x = v4_line_values[i][0];
+            }
+        }
+        std::cout << "Texture X :" << v4_texture_x << "\n";
+        std::cout << "Texture Y :" << v4_texture_y << "\n";
+        TexturePoint t_v4 = TexturePoint(v4_texture_x, v4_texture_y);
         v4.texturePoint = t_v4;
         texture_fillBottomFlatTriangle(vt1, vt2, v4, rgb_values);
         texture_fillTopFlatTriangle(vt2, v4, vt3, rgb_values);
