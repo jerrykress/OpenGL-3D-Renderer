@@ -1,4 +1,4 @@
-PROJECT_NAME = triangle_texture
+PROJECT_NAME = cornell_box
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp
