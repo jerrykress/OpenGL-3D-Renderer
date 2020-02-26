@@ -61,7 +61,7 @@ std::map<std::string, Colour> load_mtl(std::string filename)
                     throw "Material definition is not in correct format!";
                 }
 
-                Colour mtlColour = Colour(mtlName[1], (int)std::stof(mtlVal[1]) * 255, (int)std::stof(mtlVal[2]) * 255, (int)std::stof(mtlVal[3]) * 255);
+                Colour mtlColour = Colour(mtlName[1], (int)(std::stof(mtlVal[1]) * 255), (int)(std::stof(mtlVal[2]) * 255), (int)(std::stof(mtlVal[3]) * 255));
 
                 mtl.insert(std::pair<std::string, Colour>(mtlName[1], mtlColour));
 
