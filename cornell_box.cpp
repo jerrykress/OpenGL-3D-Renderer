@@ -174,42 +174,48 @@ void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colo
 {
     // interpolate(glm::vec3 a, glm::vec3 b, int gap)
     int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
-    glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
-
-    glm::vec3 *answer_left = new glm::vec3[gap];
-    answer_left = interpolate(from, to, gap);
-
-    to = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 *answer_right = new glm::vec3[gap];
-    answer_right = interpolate(from, to, gap);
-
-    for (int i = 0; i < gap; i++)
+    if (gap > 0)
     {
-        CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
-        CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
-        draw_line(color, start, end);
+        glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
+        glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
+
+        glm::vec3 *answer_left = new glm::vec3[gap];
+        answer_left = interpolate(from, to, gap);
+
+        to = glm::vec3(v3.x, v3.y, 1);
+        glm::vec3 *answer_right = new glm::vec3[gap];
+        answer_right = interpolate(from, to, gap);
+
+        for (int i = 0; i < gap; i++)
+        {
+            CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
+            CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
+            draw_line(color, start, end);
+        }
     }
 }
 void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
     // interpolate(glm::vec3 a, glm::vec3 b, int gap)
     int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 to = glm::vec3(v1.x, v1.y, 1);
-
-    glm::vec3 *answer_left = new glm::vec3[gap];
-    answer_left = interpolate(from, to, gap);
-
-    to = glm::vec3(v2.x, v2.y, 1);
-    glm::vec3 *answer_right = new glm::vec3[gap];
-    answer_right = interpolate(from, to, gap);
-
-    for (int i = 0; i < gap; i++)
+    if (gap > 0)
     {
-        CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
-        CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
-        draw_line(color, start, end);
+        glm::vec3 from = glm::vec3(v3.x, v3.y, 1);
+        glm::vec3 to = glm::vec3(v1.x, v1.y, 1);
+
+        glm::vec3 *answer_left = new glm::vec3[gap];
+        answer_left = interpolate(from, to, gap);
+
+        to = glm::vec3(v2.x, v2.y, 1);
+        glm::vec3 *answer_right = new glm::vec3[gap];
+        answer_right = interpolate(from, to, gap);
+
+        for (int i = 0; i < gap; i++)
+        {
+            CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
+            CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
+            draw_line(color, start, end);
+        }
     }
 }
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
@@ -332,12 +338,12 @@ std::map<int, std::string> load_colour(std::string filename)
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth)
 {
     std::vector<CanvasTriangle> projected;
-    int focal = (HEIGHT / 2);
+    int focal = (HEIGHT / 1.5);
     for (ModelTriangle face : faces)
     {
-        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / (face.vertices[0].z + depth), (face.vertices[0].y * -1) * focal / (face.vertices[0].z + depth)),
-                                           CanvasPoint(face.vertices[1].x * focal / (face.vertices[1].z + depth), (face.vertices[1].y * -1) * focal / (face.vertices[1].z + depth)),
-                                           CanvasPoint(face.vertices[2].x * focal / (face.vertices[2].z + depth), (face.vertices[2].y * -1) * focal / (face.vertices[2].z + depth))));
+        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1) + depth), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1) + depth)),
+                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1) + depth), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1) + depth)),
+                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1) + depth), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1) + depth))));
     }
 
     return projected;
