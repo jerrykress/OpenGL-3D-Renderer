@@ -10,6 +10,7 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <map>
 
 #define WIDTH 320
 #define HEIGHT 240
@@ -22,11 +23,66 @@ glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap);
 int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color);
-void filled_triangle(CanvasTriangle triangle);
+void filled_triangle(CanvasTriangle triangle, Colour tri_color);
 void display_obj(std::string filename, float canvasDepth);
+std::map<int, std::string> load_colour(std::string filename);
+std::map<std::string, Colour> load_mtl(std::string filename);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
+
+std::map<std::string, Colour> load_mtl(std::string filename)
+{
+    //metadata
+    std::ifstream file(filename.c_str());
+    //mtl lookup table
+    std::map<std::string, Colour> mtl;
+    //parsing info
+    std::vector<std::string> mtlName;
+    //flag for checking parsing
+    bool parsingMtl = false;
+
+    if (file.is_open())
+    {
+        std::string line;
+        while (std::getline(file, line))
+        {
+            if (parsingMtl)
+            {
+                if (line.length() < 1)
+                {
+                    throw "Empty material found!";
+                }
+
+                std::vector<std::string> mtlVal = split(line, ' ');
+
+                if (mtlVal.size() != 4 || mtlVal[0] != "Kd")
+                {
+                    throw "Material definition is not in correct format!";
+                }
+
+                Colour mtlColour = Colour(mtlName[1], (int)std::stof(mtlVal[1]) * 255, (int)std::stof(mtlVal[2]) * 255, (int)std::stof(mtlVal[3]) * 255);
+
+                mtl.insert(std::pair<std::string, Colour>(mtlName[1], mtlColour));
+
+                parsingMtl = false;
+            }
+
+            if (line.length() < 1)
+                continue;
+
+            mtlName = split(line, ' ');
+
+            if (mtlName[0] == "newmtl")
+            {
+                parsingMtl = true;
+                continue;
+            }
+        }
+    }
+
+    return mtl;
+}
 
 glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap)
 {
@@ -73,7 +129,7 @@ int indexofLargestElement(float array[], int size)
 
     return index;
 }
-void filled_triangle(CanvasTriangle triangle)
+void filled_triangle(CanvasTriangle triangle, Colour tri_color)
 {
     //sort the vertices first
     float y_vertices[] = {triangle.vertices[0].y, triangle.vertices[1].y, triangle.vertices[2].y};
@@ -91,7 +147,7 @@ void filled_triangle(CanvasTriangle triangle)
         }
     }
     CanvasPoint middlePoint = triangle.vertices[index_middle];
-    Colour tri_color = Colour(255, 255, 255);
+    // Colour tri_color = Colour(255, 255, 255);
     colored_triangle(top, middlePoint, bottom, tri_color);
 }
 int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint intersection)
@@ -235,6 +291,41 @@ std::vector<ModelTriangle> load_obj(std::string filename)
     return faces;
 }
 
+std::map<int, std::string> load_colour(std::string filename){
+    std::map<int, std::string> face_mtl;
+
+    //metadata
+    std::ifstream file(filename.c_str());
+    std::string currentColour;
+    int faceIndex = 0;
+
+    //read in entire file line by line
+    if (file.is_open())
+    {
+        std::string line;
+        while (std::getline(file, line))
+        {
+            if (line.length() < 1)
+                continue;
+            line.erase(std::remove(line.begin(), line.end(), '/'), line.end());
+
+            std::vector<std::string> chunks = split(line, ' ');
+            
+            if(chunks[0] == "usemtl"){
+                currentColour = chunks[1];
+                continue;
+            }
+
+            if(chunks[0] == "f"){
+                face_mtl.insert(std::pair<int, std::string>(faceIndex, currentColour));
+                faceIndex++;
+            }
+        }
+    }
+
+    return face_mtl;
+}
+
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth)
 {
     std::vector<CanvasTriangle> projected;
@@ -295,10 +386,12 @@ void handleEvent(SDL_Event event)
 void display_obj(std::string filename, float canvasDepth)
 {
     std::vector<CanvasTriangle> triangles = project(load_obj(filename), canvasDepth);
+    std::map<int, std::string> face_mtl = load_colour("cornell.obj");
+    std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
 
-    for (CanvasTriangle triangle : triangles)
-    {
-        stroke_triangle(triangle);
+    for(int i = 0; i < triangles.size(); i++){
+        stroke_triangle(triangles[i]);
+        filled_triangle(triangles[i], mtls[face_mtl[i]]);
     }
 }
 
