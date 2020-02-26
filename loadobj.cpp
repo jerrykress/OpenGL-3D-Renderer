@@ -24,11 +24,12 @@ int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color);
 void filled_triangle(CanvasTriangle triangle, Colour tri_color);
-void display_obj(std::string filename, float canvasDepth);
+void display_obj(std::string obj_filename, std::string mtl_filename, float canvasDepth);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
+float depthBuffer[WIDTH][HEIGHT];
 Colour white = Colour(255, 255, 255);
 
 std::map<std::string, Colour> load_mtl(std::string filename)
@@ -383,11 +384,11 @@ void handleEvent(SDL_Event event)
         std::cout << "MOUSE CLICKED" << std::endl;
 }
 
-void display_obj(std::string filename, float canvasDepth)
+void display_obj(std::string obj_filename, std::string mtl_filename, float canvasDepth)
 {
-    std::vector<CanvasTriangle> triangles = project(load_obj(filename), canvasDepth);
-    std::map<int, std::string> face_mtl = load_colour("cornell.obj");
-    std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
+    std::vector<CanvasTriangle> triangles = project(load_obj(obj_filename), canvasDepth);
+    std::map<int, std::string> face_mtl = load_colour(obj_filename);
+    std::map<std::string, Colour> mtls = load_mtl(mtl_filename);
 
     for(int i = 0; i < triangles.size(); i++){
         stroke_triangle(triangles[i]);
@@ -405,7 +406,7 @@ int main(int argc, char *argv[])
         {
             handleEvent(event);
         }
-        display_obj("cornell.obj", 10);
+        display_obj("cornell.obj", "cornell-box.mtl", 10);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
         window.renderFrame();
     }
