@@ -12,8 +12,8 @@
 using namespace std;
 using namespace glm;
 
-#define WIDTH 320
-#define HEIGHT 240
+#define WIDTH 1024
+#define HEIGHT 768
 
 void stroke_triangle(CanvasTriangle triangle);
 void draw(Colour line_colour, CanvasPoint start, CanvasPoint end);
@@ -33,14 +33,14 @@ DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap)
 {
     glm::vec3 *answer = new glm::vec3[gap];
-    double step1 = (b[0] - a[0]) / (gap - 1);
-    double step2 = (b[1] - a[1]) / (gap - 1);
-    double step3 = (b[2] - a[2]) / (gap - 1);
+    double step1 = (b[0] - a[0]) / (gap);
+    double step2 = (b[1] - a[1]) / (gap);
+    double step3 = (b[2] - a[2]) / (gap);
 
     // first value and last value
     answer[0] = a;
     answer[gap - 1] = b;
-    for (int i = 1; i < gap - 1; i++)
+    for (int i = 1; i < gap; i++)
     {
         double val1 = a[0] + (i * step1);
         double val2 = a[1] + (i * step2);
@@ -73,9 +73,9 @@ void draw(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {
     // window.clearPixels();
     // draw_line(line_colour, start, end);
-    CanvasPoint a = CanvasPoint(160.0, 10.0);
-    CanvasPoint b = CanvasPoint(300.0, 230.0);
-    CanvasPoint c = CanvasPoint(10.0, 150.0);
+    CanvasPoint a = CanvasPoint(50.0, 50.0);
+    CanvasPoint b = CanvasPoint(50.0, 350.0);
+    CanvasPoint c = CanvasPoint(500.0, 50.0);
 
     CanvasTriangle triangle = CanvasTriangle(a, b, c, line_colour);
     stroke_triangle(triangle);
@@ -154,7 +154,7 @@ int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint inte
         return round(numberOfSteps);
     }
 }
-// http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html source 
+// http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html source
 void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
     // interpolate(glm::vec3 a, glm::vec3 b, int gap)
@@ -196,10 +196,14 @@ void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour 
         CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
         draw_line(color, start, end);
     }
-
 }
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
 {
+
+    float red = color.red;
+    float green = color.green;
+    float blue = color.blue;
+    uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
     if (vt2.y == vt3.y)
     {
         fillBottomFlatTriangle(vt1, vt2, vt3, color);
@@ -213,26 +217,45 @@ void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour 
         CanvasPoint v4 = CanvasPoint(
             (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))), vt2.y);
         fillBottomFlatTriangle(vt1, vt2, v4, color);
+        draw_line(color, vt2, v4);
+        window.setPixelColour(round(v4.x), round(v4.y), colour);
         fillTopFlatTriangle(vt2, v4, vt3, color);
     }
+
     draw_line(color, vt1, vt3);
+    draw_line(color, vt2, vt3);
+    draw_line(color, vt1, vt2);
+    window.setPixelColour(round(vt1.x), round(vt1.y), colour);
+    window.setPixelColour(round(vt2.x), round(vt2.y), colour);
+    window.setPixelColour(round(vt3.x), round(vt3.y), colour);
 }
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {
     float xDiff = end.x - start.x;
     float yDiff = end.y - start.y;
     float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
-    float xStepSize = xDiff / numberOfSteps;
-    float yStepSize = yDiff / numberOfSteps;
-    for (float i = 0.0; i < numberOfSteps; i++)
+    if (numberOfSteps > 0)
     {
-        float x = start.x + (xStepSize * i);
-        float y = start.y + (yStepSize * i);
+        float xStepSize = xDiff / numberOfSteps;
+        float yStepSize = yDiff / numberOfSteps;
+        for (float i = 0.0; i < numberOfSteps; i++)
+        {
+            float x = start.x + (xStepSize * i);
+            float y = start.y + (yStepSize * i);
+            float red = line_colour.red;
+            float green = line_colour.green;
+            float blue = line_colour.blue;
+            uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
+            window.setPixelColour(round(x), round(y), colour);
+        }
+    }
+    else
+    {
         float red = line_colour.red;
         float green = line_colour.green;
         float blue = line_colour.blue;
         uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-        window.setPixelColour(round(x), round(y), colour);
+        window.setPixelColour(round(start.x + (WIDTH / 2)), round(start.y + (HEIGHT / 1.3)), colour);
     }
 }
 void update()

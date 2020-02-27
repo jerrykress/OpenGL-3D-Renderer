@@ -87,14 +87,14 @@ std::map<std::string, Colour> load_mtl(std::string filename)
 glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap)
 {
     glm::vec3 *answer = new glm::vec3[gap];
-    double step1 = (b[0] - a[0]) / (gap - 1);
-    double step2 = (b[1] - a[1]) / (gap - 1);
-    double step3 = (b[2] - a[2]) / (gap - 1);
+    double step1 = (b[0] - a[0]) / (gap);
+    double step2 = (b[1] - a[1]) / (gap);
+    double step3 = (b[2] - a[2]) / (gap);
 
     // first value and last value
     answer[0] = a;
     answer[gap - 1] = b;
-    for (int i = 1; i < gap - 1; i++)
+    for (int i = 1; i < gap; i++)
     {
         double val1 = a[0] + (i * step1);
         double val2 = a[1] + (i * step2);
@@ -220,6 +220,10 @@ void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour 
 }
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
 {
+    float red = color.red;
+    float green = color.green;
+    float blue = color.blue;
+    uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
     if (vt2.y == vt3.y)
     {
         fillBottomFlatTriangle(vt1, vt2, vt3, color);
@@ -234,8 +238,15 @@ void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour 
             (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))), vt2.y);
         fillBottomFlatTriangle(vt1, vt2, v4, color);
         fillTopFlatTriangle(vt2, v4, vt3, color);
+        window.setPixelColour(round(v4.x + (WIDTH / 2)), round(v4.y + (HEIGHT / 1.3)), colour);
     }
     draw_line(color, vt1, vt3);
+    draw_line(color, vt2, vt3);
+    draw_line(color, vt1, vt2);
+
+    window.setPixelColour(round(vt1.x + (WIDTH / 2)), round(vt1.y + (HEIGHT / 1.3)), colour);
+    window.setPixelColour(round(vt2.x + (WIDTH / 2)), round(vt2.y + (HEIGHT / 1.3)), colour);
+    window.setPixelColour(round(vt3.x + (WIDTH / 2)), round(vt3.y + (HEIGHT / 1.3)), colour);
 }
 
 std::vector<std::string> split(std::string str, char delimiter)
