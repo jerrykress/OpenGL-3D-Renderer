@@ -24,11 +24,41 @@ void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colo
 void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color);
 int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint intersection);
 void update();
+std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
 int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
 void handleEvent(SDL_Event event);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
+
+std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size)
+{
+    // std::vector<glm::vec3> l;
+    // float t = (1.0 / float(size));
+    // float t_iter = 0;
+    // for (int i = 0; i < size + 1; i++)
+    // {
+    //     t_iter = t * i;
+    //     l.push_back((from * glm::vec3(1 - t_iter,
+    //                                   1 - t_iter,
+    //                                   1 - t_iter)) +
+    //                 to * glm::vec3(t_iter, t_iter, t_iter));
+    // }
+    // return l;
+
+    // OLD CODE Linear interpolation
+    std::vector<glm::vec3> l;
+    glm::vec3 step = glm::vec3((to - from).x / (size),
+                               (to - from).y / (size),
+                               (to - from).z / (size));
+    for (int i = 0; i < size + 1; i++)
+    {
+        l.push_back(from + glm::vec3(i * step.x,
+                                     i * step.y,
+                                     i * step.z));
+    }
+    return l;
+}
 
 glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap)
 {
@@ -162,33 +192,30 @@ void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colo
     glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
     glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
 
-    glm::vec3 *answer_left = new glm::vec3[gap];
-    answer_left = interpolate(from, to, gap);
+    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
 
     to = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 *answer_right = new glm::vec3[gap];
-    answer_right = interpolate(from, to, gap);
+    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
 
-    for (int i = 0; i < gap; i++)
+    for (int i = 0; i < gap + 1; i++)
     {
         CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
         CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
         draw_line(color, start, end);
     }
+    draw_line(color, v1, v3);
 }
 void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
     // interpolate(glm::vec3 a, glm::vec3 b, int gap)
     int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 to = glm::vec3(v1.x, v1.y, 1);
+    glm::vec3 to = glm::vec3(v3.x, v3.y, 1);
+    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
 
-    glm::vec3 *answer_left = new glm::vec3[gap];
-    answer_left = interpolate(from, to, gap);
+    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
 
-    to = glm::vec3(v2.x, v2.y, 1);
-    glm::vec3 *answer_right = new glm::vec3[gap];
-    answer_right = interpolate(from, to, gap);
+    from = glm::vec3(v2.x, v2.y, 1);
+    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
 
     for (int i = 0; i < gap; i++)
     {
@@ -200,16 +227,14 @@ void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour 
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
 {
 
-    float red = color.red;
-    float green = color.green;
-    float blue = color.blue;
-    uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
     if (vt2.y == vt3.y)
     {
+
         fillBottomFlatTriangle(vt1, vt2, vt3, color);
     }
     else if (vt1.y == vt2.y)
     {
+
         fillTopFlatTriangle(vt1, vt2, vt3, color);
     }
     else
@@ -217,17 +242,8 @@ void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour 
         CanvasPoint v4 = CanvasPoint(
             (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))), vt2.y);
         fillBottomFlatTriangle(vt1, vt2, v4, color);
-        draw_line(color, vt2, v4);
-        window.setPixelColour(round(v4.x), round(v4.y), colour);
         fillTopFlatTriangle(vt2, v4, vt3, color);
     }
-
-    draw_line(color, vt1, vt3);
-    draw_line(color, vt2, vt3);
-    draw_line(color, vt1, vt2);
-    window.setPixelColour(round(vt1.x), round(vt1.y), colour);
-    window.setPixelColour(round(vt2.x), round(vt2.y), colour);
-    window.setPixelColour(round(vt3.x), round(vt3.y), colour);
 }
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {

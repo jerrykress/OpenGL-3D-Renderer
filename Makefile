@@ -1,4 +1,4 @@
-PROJECT_NAME = cornell_box
+PROJECT_NAME = cbox_filled_color
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp

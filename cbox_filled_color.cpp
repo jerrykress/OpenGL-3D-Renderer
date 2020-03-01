@@ -19,7 +19,6 @@ std::vector<std::string> split(std::string str, char delimiter);
 std::vector<ModelTriangle> load_obj(std::string filename);
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth);
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
-glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap);
 int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color);
@@ -27,9 +26,26 @@ void filled_triangle(CanvasTriangle triangle, Colour tri_color);
 void display_obj(std::string filename, float canvasDepth);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
+std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
+
+std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size)
+{
+    std::vector<glm::vec3> l;
+    float t = (1.0 / float(size));
+    float t_iter = 0;
+    for (int i = 0; i < size + 1; i++)
+    {
+        l.push_back((from * glm::vec3(1 - t_iter,
+                                      1 - t_iter,
+                                      1 - t_iter)) +
+                    to * glm::vec3(t_iter, t_iter, t_iter));
+        t_iter = t * i;
+    }
+    return l;
+}
 
 std::map<std::string, Colour> load_mtl(std::string filename)
 {
@@ -82,27 +98,6 @@ std::map<std::string, Colour> load_mtl(std::string filename)
     }
 
     return mtl;
-}
-
-glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap)
-{
-    glm::vec3 *answer = new glm::vec3[gap];
-    double step1 = (b[0] - a[0]) / (gap);
-    double step2 = (b[1] - a[1]) / (gap);
-    double step3 = (b[2] - a[2]) / (gap);
-
-    // first value and last value
-    answer[0] = a;
-    answer[gap - 1] = b;
-    for (int i = 1; i < gap; i++)
-    {
-        double val1 = a[0] + (i * step1);
-        double val2 = a[1] + (i * step2);
-        double val3 = a[2] + (i * step3);
-        glm::vec3 temp = glm::vec3(val1, val2, val3);
-        answer[i] = temp;
-    }
-    return answer;
 }
 int indexofSmallestElement(float array[], int size)
 {
@@ -172,58 +167,45 @@ int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint inte
 // http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html source
 void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
-    // interpolate(glm::vec3 a, glm::vec3 b, int gap)
+
     int gap = calculate_gap(v2, v3, v1);
-    if (gap > 0)
+    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
+    glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
+
+    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
+
+    to = glm::vec3(v3.x, v3.y, 1);
+    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
+
+    for (int i = 0; i < gap + 1; i++)
     {
-        glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
-        glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
-
-        glm::vec3 *answer_left = new glm::vec3[gap];
-        answer_left = interpolate(from, to, gap);
-
-        to = glm::vec3(v3.x, v3.y, 1);
-        glm::vec3 *answer_right = new glm::vec3[gap];
-        answer_right = interpolate(from, to, gap);
-
-        for (int i = 0; i < gap; i++)
-        {
-            CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
-            CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
-            draw_line(color, start, end);
-        }
+        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
+        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
+        draw_line(color, start, end);
     }
 }
 void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
-    // interpolate(glm::vec3 a, glm::vec3 b, int gap)
+
     int gap = calculate_gap(v2, v3, v1);
-    if (gap > 0)
+    glm::vec3 to = glm::vec3(v3.x, v3.y, 1);
+    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
+
+    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
+
+    from = glm::vec3(v2.x, v2.y, 1);
+    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
+
+    for (int i = 0; i < gap + 1; i++)
     {
-        glm::vec3 from = glm::vec3(v3.x, v3.y, 1);
-        glm::vec3 to = glm::vec3(v1.x, v1.y, 1);
-
-        glm::vec3 *answer_left = new glm::vec3[gap];
-        answer_left = interpolate(from, to, gap);
-
-        to = glm::vec3(v2.x, v2.y, 1);
-        glm::vec3 *answer_right = new glm::vec3[gap];
-        answer_right = interpolate(from, to, gap);
-
-        for (int i = 0; i < gap; i++)
-        {
-            CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]));
-            CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]));
-            draw_line(color, start, end);
-        }
+        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
+        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
+        draw_line(color, start, end);
     }
 }
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
 {
-    float red = color.red;
-    float green = color.green;
-    float blue = color.blue;
-    uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
+
     if (vt2.y == vt3.y)
     {
         fillBottomFlatTriangle(vt1, vt2, vt3, color);
@@ -238,15 +220,7 @@ void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour 
             (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))), vt2.y);
         fillBottomFlatTriangle(vt1, vt2, v4, color);
         fillTopFlatTriangle(vt2, v4, vt3, color);
-        window.setPixelColour(round(v4.x + (WIDTH / 2)), round(v4.y + (HEIGHT / 1.3)), colour);
     }
-    draw_line(color, vt1, vt3);
-    draw_line(color, vt2, vt3);
-    draw_line(color, vt1, vt2);
-
-    window.setPixelColour(round(vt1.x + (WIDTH / 2)), round(vt1.y + (HEIGHT / 1.3)), colour);
-    window.setPixelColour(round(vt2.x + (WIDTH / 2)), round(vt2.y + (HEIGHT / 1.3)), colour);
-    window.setPixelColour(round(vt3.x + (WIDTH / 2)), round(vt3.y + (HEIGHT / 1.3)), colour);
 }
 
 std::vector<std::string> split(std::string str, char delimiter)
@@ -437,7 +411,7 @@ int main(int argc, char *argv[])
         {
             handleEvent(event);
         }
-        display_obj("cornell.obj", 10);
+        display_obj("cornell.obj", 5);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
         window.renderFrame();
     }
