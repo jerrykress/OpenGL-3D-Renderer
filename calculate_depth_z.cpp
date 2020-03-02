@@ -148,12 +148,12 @@ void calculate_depth(CanvasTriangle triangle)
 void calculate_depth_topflat(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3)
 {
     int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 to = glm::vec3(v3.x, v3.y, v3.z);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, v1.z);
+    glm::vec3 to = glm::vec3(v3.x, v3.y, v3.depth);
+    glm::vec3 from = glm::vec3(v1.x, v1.y, v1.depth);
 
     std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
 
-    from = glm::vec3(v2.x, v2.y, v2.z);
+    from = glm::vec3(v2.x, v2.y, v2.depth);
     std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
 
     for (int i = 0; i < gap + 1; i++)
@@ -176,12 +176,12 @@ void calculate_depth_bottomflat(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3)
 {
 
     int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, v1.z);
-    glm::vec3 to = glm::vec3(v2.x, v2.y, v2.z);
+    glm::vec3 from = glm::vec3(v1.x, v1.y, v1.depth);
+    glm::vec3 to = glm::vec3(v2.x, v2.y, v2.depth);
 
     std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
 
-    to = glm::vec3(v3.x, v3.y, v3.z);
+    to = glm::vec3(v3.x, v3.y, v3.depth);
     std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
 
     for (int i = 0; i < gap + 1; i++)
