@@ -29,27 +29,21 @@ std::vector<std::vector<int>> camera_movement(float horizontal, float vertical, 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 
-glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap)
+std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size)
 {
-    glm::vec3 *answer = new glm::vec3[gap];
-    double step1 = (b[0] - a[0]) / (gap - 1);
-    double step2 = (b[1] - a[1]) / (gap - 1);
-    double step3 = (b[2] - a[2]) / (gap - 1);
-
-    // first value and last value
-    answer[0] = a;
-    answer[gap - 1] = b;
-    for (int i = 1; i < gap - 1; i++)
+    std::vector<glm::vec3> l;
+    float t = (1.0 / float(size));
+    float t_iter = 0;
+    for (int i = 0; i < size + 1; i++)
     {
-        double val1 = a[0] + (i * step1);
-        double val2 = a[1] + (i * step2);
-        double val3 = a[2] + (i * step3);
-        glm::vec3 temp = glm::vec3(val1, val2, val3);
-        answer[i] = temp;
+        l.push_back((from * glm::vec3(1 - t_iter,
+                                      1 - t_iter,
+                                      1 - t_iter)) +
+                    to * glm::vec3(t_iter, t_iter, t_iter));
+        t_iter = t * i;
     }
-    return answer;
+    return l;
 }
-
 std::vector<std::string> split(std::string str, char delimiter)
 {
     std::vector<std::string> internal;
@@ -115,7 +109,7 @@ std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float dept
     //rotate
     for (ModelTriangle face : faces)
     {
-        //each triangle coordinates 
+        //each triangle coordinates
         for (int i = 0; i < 3; i++)
         {
             int angel_x = camera_movement[1][0];
@@ -242,7 +236,7 @@ std::vector<std::vector<int>> camera_movement(float horizontal, float vertical, 
     camera_movement[0][2] = depth;
 
     // camera_movement[1][0] = 200;
-    camera_movement[1][1] = 180; 
+    camera_movement[1][1] = 180;
 
     return camera_movement;
 }

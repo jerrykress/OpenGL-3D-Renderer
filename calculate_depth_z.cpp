@@ -30,6 +30,7 @@ std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
+float incomingDepth[WIDTH][HEIGHT];
 
 std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size)
 {
@@ -124,7 +125,72 @@ int indexofLargestElement(float array[], int size)
 
     return index;
 }
+void calculate_depth(CanvasTriangle triangle)
+{
+    float y_vertices[] = {triangle.vertices[0].y, triangle.vertices[1].y, triangle.vertices[2].y};
+    int index_smallest = indexofSmallestElement(y_vertices, 3);
+    int index_largest = indexofLargestElement(y_vertices, 3);
+    CanvasPoint top = triangle.vertices[index_smallest];
+    CanvasPoint bottom = triangle.vertices[index_largest];
+    int index_middle = 0;
+    // find middle value
+    for (int i = 0; i < 3; i++)
+    {
+        if ((index_smallest != i) && (index_largest != i))
+        {
+            index_middle = i;
+        }
+    }
+    CanvasPoint middlePoint = triangle.vertices[index_middle];
+    // Colour tri_color = Colour(255, 255, 255);
+    // colored_triangle(top, middlePoint, bottom);
+}
+void calculate_depth_topflat(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3)
+{
+    int gap = calculate_gap(v2, v3, v1);
+    glm::vec3 to = glm::vec3(v3.x, v3.y, v3.z);
+    glm::vec3 from = glm::vec3(v1.x, v1.y, v1.z);
 
+    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
+
+    from = glm::vec3(v2.x, v2.y, v2.z);
+    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
+
+    for (int i = 0; i < gap + 1; i++)
+    {
+        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
+        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
+        input_to_global_depth(start, end);
+    }
+}
+void input_to_global_depth(CanvasPoint start, CanvasPoint end)
+{
+    row_length = abs(end.y - start.y);
+    std::vector<glm::vec3> row_depth = interpolate(from, to, row_length);
+    for (int i = 0; i < row_length + 1; i++)
+    {
+        incomingDepth[row_depth[i][0]][row_depth[i][1]] = row_depth[i][2];
+    }
+}
+void calculate_depth_bottomflat(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3)
+{
+
+    int gap = calculate_gap(v2, v3, v1);
+    glm::vec3 from = glm::vec3(v1.x, v1.y, v1.z);
+    glm::vec3 to = glm::vec3(v2.x, v2.y, v2.z);
+
+    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
+
+    to = glm::vec3(v3.x, v3.y, v3.z);
+    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
+
+    for (int i = 0; i < gap + 1; i++)
+    {
+        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
+        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
+        input_to_global_depth(start, end);
+    }
+}
 void filled_triangle(CanvasTriangle triangle, Colour tri_color)
 {
     //sort the vertices first
@@ -144,7 +210,22 @@ void filled_triangle(CanvasTriangle triangle, Colour tri_color)
     }
     CanvasPoint middlePoint = triangle.vertices[index_middle];
     // Colour tri_color = Colour(255, 255, 255);
-    colored_triangle(top, middlePoint, bottom, tri_color);
+    // colored_triangle(top, middlePoint, bottom, tri_color);
+    if (middlePoint.y == bottom.y)
+    {
+        calculate_depth_bottomflat(top, middlePoint, bottom, color);
+    }
+    else if (top.y == middlePoint.y)
+    {
+        calculate_depth_topflat(top, middlePoint, bottom, color);
+    }
+    else
+    {
+        CanvasPoint v4 = CanvasPoint(
+            (top.x + (((middlePoint.y - top.y) / (bottom.y - top.y)) * (bottom.x - top.x))), middlePoint.y);
+        calculate_depth_bottomflat(top, middlePoint, v4);
+        calculate_depth_topflat(middlePoint, v4, bottom);
+    }
 }
 int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint intersection)
 {
