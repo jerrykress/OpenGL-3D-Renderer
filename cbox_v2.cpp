@@ -17,7 +17,7 @@
 
 std::vector<std::string> split(std::string str, char delimiter);
 std::vector<ModelTriangle> load_obj(std::string filename);
-std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth);
+std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces);
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
 int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
@@ -321,43 +321,15 @@ std::map<int, std::string> load_colour(std::string filename)
     return face_mtl;
 }
 
-glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
-{
-    // rotate by x-axis
-    glm::vec3 new_cam_position = cameraPosition;
-    if (angle_x != 0)
-    {
-        glm::mat3 rotationMatrix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0, cos(angle_x), -sin(angle_x)),
-                                 glm::vec3(0.0, sin(angle_x), cos(angle_x)));
-        new_cam_position = cameraPosition * rotationMatrix;
-    }
-
-    if (angle_y != 0)
-    {
-        // rotate by y-axis
-        glm::mat3 rotationMatrix(glm::vec3(cos(angle_y), 0.0, sin(angle_y)), glm::vec3(0.0, 1.0, 0.0),
-                                 glm::vec3(-sin(angle_y), 0.0, cos(angle_y)));
-        new_cam_position = cameraPosition * rotationMatrix;
-    }
-    return new_cam_position;
-}
-std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth)
+std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces)
 {
     std::vector<CanvasTriangle> projected;
-    int focal = (HEIGHT / 2);
-    glm::vec3 cameraPosition = glm::vec3(0, 0, 4);
-    cameraPosition = camera_rotation(0, 45, cameraPosition);
-    cameraPosition[2] = cameraPosition[2] + 4;
-
+    int focal = (HEIGHT/2);
     for (ModelTriangle face : faces)
     {
-        face.vertices[0] = face.vertices[0] - cameraPosition;
-        face.vertices[1] = face.vertices[1] - cameraPosition;
-        face.vertices[2] = face.vertices[2] - cameraPosition;
-
-        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1)), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1))),
-                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1)), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1))),
-                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1)))));
+        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z)), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z))),
+                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z)), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z))),
+                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z)))));
     }
 
     return projected;
@@ -367,7 +339,6 @@ void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {
     float xDiff = end.x - start.x;
     float yDiff = end.y - start.y;
-
     float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
     if (numberOfSteps > 0)
     {
@@ -441,7 +412,7 @@ int main(int argc, char *argv[])
         {
             handleEvent(event);
         }
-        display_obj("cornell.obj", 5);
+        display_obj("cornell.obj", 6);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
         window.renderFrame();
     }

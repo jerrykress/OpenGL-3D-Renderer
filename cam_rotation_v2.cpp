@@ -15,17 +15,23 @@
 #define WIDTH 1024
 #define HEIGHT 768
 
-std::vector<std::string> split(std::string str, char delimiter);
-std::vector<ModelTriangle> load_obj(std::string filename);
-std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth);
-void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
+// triangle functions
 int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color);
 void filled_triangle(CanvasTriangle triangle, Colour tri_color);
-void display_obj(std::string filename, float canvasDepth);
+void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
+
+//camera movement functions
+void display_obj(std::string filename, float canvasDepth, std::vector<std::vector<int>> camera_movement);
+std::vector<std::vector<int>> camera_movement(float horizontal, float vertical, float depth);
+std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth, std::vector<std::vector<int>> camera_movement);
+
+//load color, obj and interpolate
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
+std::vector<std::string> split(std::string str, char delimiter);
+std::vector<ModelTriangle> load_obj(std::string filename);
 std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
@@ -283,6 +289,30 @@ std::vector<ModelTriangle> load_obj(std::string filename)
     return faces;
 }
 
+std::vector<std::vector<int>> camera_movement(float horizontal, float vertical, float depth)
+{
+    std::vector<std::vector<int>> camera_movement(3);
+    for (int i = 0; i < 3; i++)
+    {
+        camera_movement[i].resize(3);
+    }
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            camera_movement[i][j] = 0;
+        }
+    }
+    camera_movement[0][0] = horizontal;
+    camera_movement[0][1] = vertical;
+    camera_movement[0][2] = depth;
+
+    camera_movement[1][2] = 45;
+    // camera_movement[1][1] = 180;
+
+    return camera_movement;
+}
+
 std::map<int, std::string> load_colour(std::string filename)
 {
     std::map<int, std::string> face_mtl;
@@ -321,43 +351,127 @@ std::map<int, std::string> load_colour(std::string filename)
     return face_mtl;
 }
 
-glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
-{
-    // rotate by x-axis
-    glm::vec3 new_cam_position = cameraPosition;
-    if (angle_x != 0)
-    {
-        glm::mat3 rotationMatrix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0, cos(angle_x), -sin(angle_x)),
-                                 glm::vec3(0.0, sin(angle_x), cos(angle_x)));
-        new_cam_position = cameraPosition * rotationMatrix;
-    }
-
-    if (angle_y != 0)
-    {
-        // rotate by y-axis
-        glm::mat3 rotationMatrix(glm::vec3(cos(angle_y), 0.0, sin(angle_y)), glm::vec3(0.0, 1.0, 0.0),
-                                 glm::vec3(-sin(angle_y), 0.0, cos(angle_y)));
-        new_cam_position = cameraPosition * rotationMatrix;
-    }
-    return new_cam_position;
-}
-std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth)
+std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth, std::vector<std::vector<int>> camera_movement)
 {
     std::vector<CanvasTriangle> projected;
-    int focal = (HEIGHT / 2);
-    glm::vec3 cameraPosition = glm::vec3(0, 0, 4);
-    cameraPosition = camera_rotation(0, 45, cameraPosition);
-    cameraPosition[2] = cameraPosition[2] + 4;
+    // int focal = (HEIGHT / 1.75);
+    int focal = 5;
+
+    //calculate changes of rotation in the camera
+    // int angel_x = camera_movement[1][0];
+    // int angel_y = camera_movement[1][1];
+    // int angel_z = camera_movement[1][2];
+    // glm::vec3 vertices = glm::vec3(0.0, 0.0, 0.0);
+    // if (angel_x != 0)
+    // {
+    //     glm::mat3 rotationMatrix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0, cos(angel_x), -sin(angel_x)),
+    //                              glm::vec3(0.0, sin(angel_x), cos(angel_x)));
+    //     glm::vec3 rotation = vertices * rotationMatrix;
+    //     std::cout << "Angle : " << angel_x << "\n";
+    //     std::cout << "COS : " << cos(angel_x) << " SIN : " << sin(angel_x) << "\n";
+    // }
+
+    // if (angel_y != 0)
+    // {
+    //     // rotate by y-axis
+    //     glm::mat3 rotationMatrix(glm::vec3(cos(angel_y), 0.0, sin(angel_y)), glm::vec3(0.0, 1.0, 0.0),
+    //                              glm::vec3(-sin(angel_y), 0.0, cos(angel_y)));
+    //     vertices = vertices * rotationMatrix;
+    // }
+
+    // if (angel_z != 0)
+    // {
+    //     // rotate by y-axis
+    //     glm::mat3 rotationMatrix(glm::vec3(cos(angel_z), -sin(angel_z), 0.0), glm::vec3(sin(angel_z), cos(angel_z), 0.0),
+    //                              glm::vec3(0.0, 0.0, 1.0));
+    //     vertices = vertices * rotationMatrix;
+    // }
+
+    // // we map those changes to the vertices
+    // for (ModelTriangle face : faces)
+    // {
+    //     //each triangle coordinates
+    //     for (int i = 0; i < 3; i++)
+    //     {
+    //         if (vertices[0] < 0)
+    //         {
+    //             face.vertices[i].x = face.vertices[i].x + abs(vertices[0]);
+    //         }
+    //         else
+    //         {
+    //             face.vertices[i].x = face.vertices[i].x - vertices[0];
+    //         }
+    //         if (vertices[1] < 0)
+    //         {
+    //             face.vertices[i].y = face.vertices[i].y + abs(vertices[1]);
+    //         }
+    //         else
+    //         {
+    //             face.vertices[i].y = face.vertices[i].y - vertices[1];
+    //         }
+    //         if (vertices[0] < 0)
+    //         {
+    //             face.vertices[i].z = face.vertices[i].z + abs(vertices[2]);
+    //         }
+    //         else
+    //         {
+    //             face.vertices[i].z = face.vertices[i].z - vertices[2];
+    //         }
+    //     }
+    // }
 
     for (ModelTriangle face : faces)
     {
-        face.vertices[0] = face.vertices[0] - cameraPosition;
-        face.vertices[1] = face.vertices[1] - cameraPosition;
-        face.vertices[2] = face.vertices[2] - cameraPosition;
+        //each triangle coordinates
+        for (int i = 0; i < 3; i++)
+        {
+            int angel_x = camera_movement[1][0];
+            int angel_y = camera_movement[1][1];
+            int angel_z = camera_movement[1][2];
+            // rotate by x-axis
+            glm::vec3 vertices = glm::vec3(face.vertices[i].x, face.vertices[i].y, face.vertices[i].z);
 
-        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1)), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1))),
-                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1)), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1))),
-                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1)))));
+            if (angel_x > 0)
+            {
+                glm::mat3 rotationMatrix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0, cos(angel_x), -sin(angel_x)),
+                                         glm::vec3(0.0, sin(angel_x), cos(angel_x)));
+                glm::vec3 rotated = vertices * rotationMatrix;
+                // std::cout << "BEFORE -> x : " << face.vertices[i].x << " y : " << face.vertices[i].x << "z : " << face.vertices[i].z << "\n";
+                face.vertices[i].x = rotated[0];
+                face.vertices[i].y = rotated[1];
+                face.vertices[i].z = rotated[2];
+                // std::cout << " AFTER -> x : " << face.vertices[i].x << " y : " << face.vertices[i].x << "z : " << face.vertices[i].z << "\n";
+            }
+
+            if (angel_y > 0)
+            {
+                // rotate by y-axis
+                glm::mat3 rotationMatrix(glm::vec3(cos(angel_y), 0.0, sin(angel_y)), glm::vec3(0.0, 1.0, 0.0),
+                                         glm::vec3(-sin(angel_y), 0.0, cos(angel_y)));
+                glm::vec3 rotated = vertices * rotationMatrix;
+                face.vertices[i].x = rotated[0];
+                face.vertices[i].y = rotated[1];
+                face.vertices[i].z = rotated[2];
+            }
+
+            if (angel_z > 0)
+            {
+                // rotate by y-axis
+                glm::mat3 rotationMatrix(glm::vec3(cos(angel_z), -sin(angel_z), 0.0), glm::vec3(sin(angel_z), cos(angel_z), 0.0),
+                                         glm::vec3(0.0, 0.0, 1.0));
+                glm::vec3 rotated = vertices * rotationMatrix;
+                face.vertices[i].x = rotated[0];
+                face.vertices[i].y = rotated[1];
+                face.vertices[i].z = rotated[2];
+            }
+        }
+    }
+
+    for (ModelTriangle face : faces)
+    {
+        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1) + depth), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1) + depth)),
+                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1) + depth), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1) + depth)),
+                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1) + depth), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1) + depth))));
     }
 
     return projected;
@@ -367,7 +481,6 @@ void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {
     float xDiff = end.x - start.x;
     float yDiff = end.y - start.y;
-
     float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
     if (numberOfSteps > 0)
     {
@@ -418,9 +531,10 @@ void handleEvent(SDL_Event event)
         std::cout << "MOUSE CLICKED" << std::endl;
 }
 
-void display_obj(std::string filename, float canvasDepth)
+void display_obj(std::string filename, float canvasDepth, std::vector<std::vector<int>> camera_movement)
 {
-    std::vector<CanvasTriangle> triangles = project(load_obj(filename), canvasDepth);
+
+    std::vector<CanvasTriangle> triangles = project(load_obj(filename), canvasDepth, camera_movement);
     std::map<int, std::string> face_mtl = load_colour("cornell.obj");
     std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
 
@@ -441,7 +555,9 @@ int main(int argc, char *argv[])
         {
             handleEvent(event);
         }
-        display_obj("cornell.obj", 5);
+
+        std::vector<std::vector<int>> cam_position = camera_movement(30, 0, 10);
+        display_obj("cornell.obj", 10, cam_position);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
         window.renderFrame();
     }
