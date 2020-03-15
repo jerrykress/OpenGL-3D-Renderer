@@ -324,12 +324,12 @@ std::map<int, std::string> load_colour(std::string filename)
 glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
 {
     // rotate by x-axis
-    glm::vec3 new_cam_position = cameraPosition;
+    // glm::vec3 new_cam_position = cameraPosition;
     if (angle_x != 0)
     {
         glm::mat3 rotationMatrix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0, cos(angle_x), -sin(angle_x)),
                                  glm::vec3(0.0, sin(angle_x), cos(angle_x)));
-        new_cam_position = cameraPosition * rotationMatrix;
+        cameraPosition = cameraPosition * rotationMatrix;
     }
 
     if (angle_y != 0)
@@ -337,17 +337,17 @@ glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
         // rotate by y-axis
         glm::mat3 rotationMatrix(glm::vec3(cos(angle_y), 0.0, sin(angle_y)), glm::vec3(0.0, 1.0, 0.0),
                                  glm::vec3(-sin(angle_y), 0.0, cos(angle_y)));
-        new_cam_position = cameraPosition * rotationMatrix;
+        cameraPosition = cameraPosition * rotationMatrix;
     }
-    return new_cam_position;
+    return cameraPosition;
 }
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth)
 {
     std::vector<CanvasTriangle> projected;
-    int focal = (HEIGHT / 2);
-    glm::vec3 cameraPosition = glm::vec3(0, 0, 4);
+    int focal = 5;
+    glm::vec3 cameraPosition = glm::vec3(0, 1, 10);
     cameraPosition = camera_rotation(0, 45, cameraPosition);
-    cameraPosition[2] = cameraPosition[2] + 4;
+    cameraPosition[2] = cameraPosition[2] + 10;
 
     for (ModelTriangle face : faces)
     {
@@ -355,9 +355,9 @@ std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float dept
         face.vertices[1] = face.vertices[1] - cameraPosition;
         face.vertices[2] = face.vertices[2] - cameraPosition;
 
-        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1)), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1))),
-                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1)), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1))),
-                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1)))));
+        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1) - depth), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1) - depth)),
+                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1) - depth), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1) - depth)),
+                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1) - depth), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1) - depth))));
     }
 
     return projected;
@@ -441,7 +441,7 @@ int main(int argc, char *argv[])
         {
             handleEvent(event);
         }
-        display_obj("cornell.obj", 5);
+        display_obj("cornell.obj", 10);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
         window.renderFrame();
     }

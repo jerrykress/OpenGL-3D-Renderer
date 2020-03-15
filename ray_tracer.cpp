@@ -14,7 +14,7 @@
 
 #define WIDTH 1024
 #define HEIGHT 768
-
+void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, int depth);
 std::vector<std::string> split(std::string str, char delimiter);
 std::vector<ModelTriangle> load_obj(std::string filename);
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth);
@@ -27,6 +27,7 @@ void display_obj(std::string filename, float canvasDepth);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
 std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
+Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
@@ -98,130 +99,6 @@ std::map<std::string, Colour> load_mtl(std::string filename)
     }
 
     return mtl;
-}
-int indexofSmallestElement(float array[], int size)
-{
-    int index = 0;
-
-    for (int i = 1; i < size; i++)
-    {
-        if (array[i] < array[index])
-            index = i;
-    }
-
-    return index;
-}
-
-int indexofLargestElement(float array[], int size)
-{
-    int index = 0;
-
-    for (int i = 1; i < size; i++)
-    {
-        if (array[i] > array[index])
-            index = i;
-    }
-
-    return index;
-}
-
-void filled_triangle(CanvasTriangle triangle, Colour tri_color)
-{
-    //sort the vertices first
-    float y_vertices[] = {triangle.vertices[0].y, triangle.vertices[1].y, triangle.vertices[2].y};
-    int index_smallest = indexofSmallestElement(y_vertices, 3);
-    int index_largest = indexofLargestElement(y_vertices, 3);
-    CanvasPoint top = triangle.vertices[index_smallest];
-    CanvasPoint bottom = triangle.vertices[index_largest];
-    int index_middle = 0;
-    // find middle value
-    for (int i = 0; i < 3; i++)
-    {
-        if ((index_smallest != i) && (index_largest != i))
-        {
-            index_middle = i;
-        }
-    }
-    CanvasPoint middlePoint = triangle.vertices[index_middle];
-    // Colour tri_color = Colour(255, 255, 255);
-    colored_triangle(top, middlePoint, bottom, tri_color);
-}
-int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint intersection)
-{
-    float xDiff = endpoint1.x - intersection.x;
-    float yDiff = endpoint1.y - intersection.y;
-    float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
-
-    float xDiff2 = endpoint2.x - intersection.x;
-    float yDiff2 = endpoint2.y - intersection.y;
-    float numberOfSteps2 = std::max(abs(xDiff2), abs(yDiff2));
-
-    if (numberOfSteps2 > numberOfSteps)
-    {
-        return round(numberOfSteps2);
-    }
-    else
-    {
-        return round(numberOfSteps);
-    }
-}
-// http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html source
-void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
-{
-
-    int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
-    glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
-
-    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
-
-    to = glm::vec3(v3.x, v3.y, 1);
-    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
-
-    for (int i = 0; i < gap + 1; i++)
-    {
-        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
-        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
-        draw_line(color, start, end);
-    }
-}
-void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
-{
-
-    int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 to = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
-
-    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
-
-    from = glm::vec3(v2.x, v2.y, 1);
-    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
-
-    for (int i = 0; i < gap + 1; i++)
-    {
-        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
-        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
-        draw_line(color, start, end);
-    }
-}
-void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
-{
-
-    if (vt2.y == vt3.y)
-    {
-        fillBottomFlatTriangle(vt1, vt2, vt3, color);
-    }
-    else if (vt1.y == vt2.y)
-    {
-        fillTopFlatTriangle(vt1, vt2, vt3, color);
-    }
-    else
-    {
-        CanvasPoint v4 = CanvasPoint(
-            (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))), vt2.y);
-        fillBottomFlatTriangle(vt1, vt2, v4, color);
-        fillTopFlatTriangle(vt2, v4, vt3, color);
-    }
 }
 
 std::vector<std::string> split(std::string str, char delimiter)
@@ -321,17 +198,29 @@ std::map<int, std::string> load_colour(std::string filename)
     return face_mtl;
 }
 
+glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
+{
+    // rotate by x-axis
+    glm::vec3 new_cam_position = cameraPosition;
+    if (angle_x != 0)
+    {
+        glm::mat3 rotationMatrix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0, cos(angle_x), -sin(angle_x)),
+                                 glm::vec3(0.0, sin(angle_x), cos(angle_x)));
+        new_cam_position = cameraPosition * rotationMatrix;
+    }
+
+    if (angle_y != 0)
+    {
+        // rotate by y-axis
+        glm::mat3 rotationMatrix(glm::vec3(cos(angle_y), 0.0, sin(angle_y)), glm::vec3(0.0, 1.0, 0.0),
+                                 glm::vec3(-sin(angle_y), 0.0, cos(angle_y)));
+        new_cam_position = cameraPosition * rotationMatrix;
+    }
+    return new_cam_position;
+}
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth)
 {
     std::vector<CanvasTriangle> projected;
-    int focal = (HEIGHT / 1.5);
-    for (ModelTriangle face : faces)
-    {
-        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1) + depth), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1) + depth)),
-                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1) + depth), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1) + depth)),
-                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1) + depth), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1) + depth))));
-    }
-
     return projected;
 }
 
@@ -364,14 +253,6 @@ void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
         window.setPixelColour(round(start.x + (WIDTH / 2)), round(start.y + (HEIGHT / 1.3)), colour);
     }
 }
-
-void stroke_triangle(CanvasTriangle triangle)
-{
-    draw_line(triangle.colour, triangle.vertices[0], triangle.vertices[1]);
-    draw_line(triangle.colour, triangle.vertices[1], triangle.vertices[2]);
-    draw_line(triangle.colour, triangle.vertices[2], triangle.vertices[0]);
-}
-
 void handleEvent(SDL_Event event)
 {
     if (event.type == SDL_KEYDOWN)
@@ -391,44 +272,66 @@ void handleEvent(SDL_Event event)
 
 void display_obj(std::string filename, float canvasDepth)
 {
-    std::vector<CanvasTriangle> triangles = project(load_obj(filename), canvasDepth);
+    std::vector<ModelTriangle> triangles = load_obj(filename);
     std::map<int, std::string> face_mtl = load_colour("cornell.obj");
     std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
 
     for (int i = 0; i < triangles.size(); i++)
     {
-        // stroke_triangle(triangles[i]);
-        filled_triangle(triangles[i], mtls[face_mtl[i]]);
+        triangles[i].colour = mtls[face_mtl[i]];
     }
+    int focal = (HEIGHT / 2);
+    // int focal = 5;
+    glm::vec3 cameraPosition = glm::vec3(0, 0, 4);
+    // cameraPosition = camera_rotation(0, 0, cameraPosition);
+    // cameraPosition[2] = cameraPosition[2] + 4;
+
+    intersection_on_pixel(cameraPosition, triangles, focal, 0);
 }
-RayTriangleIntersection getClosestIntersection(glm::vec3 cameraPosition, std::vector<CanvasTriangle> triangles, glm::vec3 ray_direction)
+Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction)
 {
     // how to loop through every point in that triangle?
-    for (CanvasTriangle triangles : triangle)
+    glm::vec3 closest_point = glm::vec3(0, 0, 0);
+    ModelTriangle closest_triangle = triangles[0];
+    float closest_t = 10000000000000.0;
+    bool is_intersection = false;
+    Colour black = Colour(0, 0, 0);
+    for (ModelTriangle triangle : triangles)
     {
-        // what are the values of u then?
-        // Questions:
-        // 1. does the triangle need to be sorted?
-        vec3 e0 = triangle.vertices[1] - triangle.vertices[0];
-        vec3 e1 = triangle.vertices[2] - triangle.vertices[0];
-        vec3 SPVector = cameraPosition - triangle.vertices[0];
-        mat3 DEMatrix(-rayDirection, e0, e1);
-        vec3 possibleSolution = glm::inverse(DEMatrix) * SPVector;
-        float u = posssibleSolution[1];
-        float v = possibleSolution[2];
-
-        if (u >= triangle.vertices[0])
-            &&(u <= triangle.vertices[1]) && (v >= triangle.vertices[0]) && (v <= triangle.vertices[2])
+        glm::vec3 e0 = triangle.vertices[1] - triangle.vertices[0];
+        glm::vec3 e1 = triangle.vertices[2] - triangle.vertices[0];
+        glm::vec3 SPVector = cameraPosition - triangle.vertices[0];
+        glm::mat3 DEMatrix(-ray_direction, e0, e1);
+        glm::vec3 possibleSolution = glm::inverse(DEMatrix) * SPVector;
+        float u = possibleSolution[0];
+        float v = possibleSolution[1];
+        float t = possibleSolution[2];
+        if (t > 0)
+        {
+            if ((0.0 <= u <= 1.0) && (0.0 <= v <= 1.0) && (u + v <= 1))
             {
-                // should be in the triangle
-                // glm::vec3 intersectionPoint = ;
-                // float distanceFromCamera = ;
-                ModelTriangle intersectedTriangle = triangle;
-                RayTriangleIntersection intersected = RayTriangleIntersection(glm::vec3 point, float distance, ModelTriangle triangle);
+                if (t < closest_t)
+                {
+                    is_intersection = true;
+                    closest_t = t;
+                    closest_triangle = triangle;
+                    closest_point = triangle.vertices[0] + (u * e0) + (v * e1);
+                }
             }
+        }
     }
+    if (is_intersection)
+    {
+        return closest_triangle.colour;
+    }
+    else
+    {
+        return black;
+    }
+
+    // return RayTriangleIntersection(closest_point, closest_t, closest_triangle)
 }
-void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<CanvasTriangle> triangles, int focal, int depth)
+void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, int depth)
 {
     //in image plane coordiantes
     for (int i = 0; i < WIDTH; i++)
@@ -439,8 +342,13 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<CanvasTriangle>
             float world_y = j - (HEIGHT / 2);
             // assuming camera is at (0,0,0)
             glm::vec3 image_plane_coord = glm::vec3(world_x, world_y, focal);
-            glm::vec3 ray_direction = image_plane_coord - cameraPosition;
-            RayTriangleIntersection closet_triangle = getClosestIntersection(cameraPosition, triangles, ray_direction);
+            glm::vec3 ray_direction = glm::normalize(image_plane_coord);
+            Colour line_colour = getClosestIntersection(cameraPosition, triangles, ray_direction);
+            float red = line_colour.red;
+            float green = line_colour.green;
+            float blue = line_colour.blue;
+            uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
+            window.setPixelColour(i, j, colour);
         }
     }
 }
