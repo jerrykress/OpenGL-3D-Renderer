@@ -280,8 +280,8 @@ void display_obj(std::string filename, float canvasDepth)
     {
         triangles[i].colour = mtls[face_mtl[i]];
     }
-    int focal = (HEIGHT / 2);
-    // int focal = 5;
+    int focal = 5;
+
     glm::vec3 cameraPosition = glm::vec3(0, 0, 4);
     // cameraPosition = camera_rotation(0, 0, cameraPosition);
     // cameraPosition[2] = cameraPosition[2] + 4;
@@ -340,7 +340,7 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
         {
             float world_x = i - (WIDTH / 2);
             float world_y = j - (HEIGHT / 2);
-            // assuming camera is at (0,0,0)
+
             glm::vec3 image_plane_coord = glm::vec3(world_x, world_y, focal);
             glm::vec3 ray_direction = glm::normalize(image_plane_coord);
             Colour line_colour = getClosestIntersection(cameraPosition, triangles, ray_direction);

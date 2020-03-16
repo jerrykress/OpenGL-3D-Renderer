@@ -14,17 +14,20 @@
 
 #define WIDTH 1024
 #define HEIGHT 768
-#define SCALING 20
+#define SCALING 60
 
 std::vector<std::string> split(std::string str, char delimiter);
 std::vector<ModelTriangle> load_obj(std::string filename);
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth);
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
+glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap);
 int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color);
 void filled_triangle(CanvasTriangle triangle, Colour tri_color);
 void display_obj(std::string filename, float canvasDepth);
+void setPixelColour_(int x, int y, Colour colour);
+void clearDepthBuffer(std::string bufferName);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
 std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
@@ -32,23 +35,14 @@ std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 
-std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size)
-{
-    std::vector<glm::vec3> l;
-    float t = (1.0 / float(size));
-    float t_iter = 0;
-    for (int i = 0; i < size + 1; i++)
-    {
-        l.push_back((from * glm::vec3(1 - t_iter,
-                                      1 - t_iter,
-                                      1 - t_iter)) +
-                    to * glm::vec3(t_iter, t_iter, t_iter));
-        t_iter = t * i;
-    }
-    return l;
-}
+// std::vector<std::vector<float>> *currentDepth = new std::vector<std::vector<float>>(WIDTH);
+// std::vector<std::vector<float>> *incomingDepth = new std::vector<std::vector<float>>(WIDTH);
 
-std::map<std::string, Colour> load_mtl(std::string filename)
+float **currentDepth = new float *[WIDTH];
+float **incomingDepth = new float *[WIDTH];
+
+std::map<std::string, Colour>
+load_mtl(std::string filename)
 {
     //metadata
     std::ifstream file(filename.c_str());
@@ -100,6 +94,85 @@ std::map<std::string, Colour> load_mtl(std::string filename)
 
     return mtl;
 }
+
+void setPixelColour_(int x, int y, Colour colour)
+{
+    if (incomingDepth[x][y] < currentDepth[x][y])
+    {
+        float red = colour.red;
+        float green = colour.green;
+        float blue = colour.blue;
+        uint32_t uint_color = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
+
+        window.setPixelColour(x, y, uint_color);
+        currentDepth[x][y] = incomingDepth[x][y];
+    }
+}
+
+glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap)
+{
+    glm::vec3 *answer = new glm::vec3[gap];
+    double step1 = (b[0] - a[0]) / (gap);
+    double step2 = (b[1] - a[1]) / (gap);
+    double step3 = (b[2] - a[2]) / (gap);
+
+    // first value and last value
+    answer[0] = a;
+    answer[gap - 1] = b;
+    for (int i = 1; i < gap; i++)
+    {
+        double val1 = a[0] + (i * step1);
+        double val2 = a[1] + (i * step2);
+        double val3 = a[2] + (i * step3);
+        glm::vec3 temp = glm::vec3(val1, val2, val3);
+        answer[i] = temp;
+    }
+    return answer;
+}
+
+std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size)
+{
+    std::vector<glm::vec3> l;
+    float t = (1.0 / float(size));
+    float t_iter = 0;
+    for (int i = 0; i < size + 1; i++)
+    {
+        l.push_back((from * glm::vec3(1 - t_iter,
+                                      1 - t_iter,
+                                      1 - t_iter)) +
+                    to * glm::vec3(t_iter, t_iter, t_iter));
+        t_iter = t * i;
+    }
+
+    return l;
+}
+
+std::vector<glm::vec3> interpolate_3(glm::vec3 from, glm::vec3 to, int size)
+{
+    std::vector<glm::vec3> l;
+    if (size > 1)
+    {
+        glm::vec3 distance = to - from;
+        float gap = size - 1;
+        glm::vec3 step = glm::vec3(distance.x / gap, distance.y / gap, distance.z / gap);
+
+        for (int i = 0; i < (size - 1); i++)
+        {
+            glm::vec3 currentStep = glm::vec3(from.x + step.x * i,
+                                              from.y + step.y * i,
+                                              from.z + step.z * i);
+            l.push_back(currentStep);
+        }
+    }
+
+    if (size == 1)
+    {
+        l.push_back(from);
+    }
+
+    return l;
+}
+
 int indexofSmallestElement(float array[], int size)
 {
     int index = 0;
@@ -125,7 +198,6 @@ int indexofLargestElement(float array[], int size)
 
     return index;
 }
-
 void filled_triangle(CanvasTriangle triangle, Colour tri_color)
 {
     //sort the vertices first
@@ -169,60 +241,84 @@ int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint inte
 // http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html source
 void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
-
+    // interpolate(glm::vec3 a, glm::vec3 b, int gap)
     int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
-    glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
-
-    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
-
-    to = glm::vec3(v3.x, v3.y, 1);
-    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
-
-    for (int i = 0; i < gap + 1; i++)
+    if (gap > 0)
     {
-        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
-        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
-        draw_line(color, start, end);
+        glm::vec3 from = glm::vec3(v1.x, v1.y, v1.depth);
+        glm::vec3 to = glm::vec3(v2.x, v2.y, v2.depth);
+
+        glm::vec3 *answer_left = new glm::vec3[gap];
+        answer_left = interpolate(from, to, gap);
+
+        to = glm::vec3(v3.x, v3.y, v3.depth);
+        glm::vec3 *answer_right = new glm::vec3[gap];
+        answer_right = interpolate(from, to, gap);
+
+        for (int i = 0; i < gap; i++)
+        {
+            CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]), round(answer_left[i][2]));
+            CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]), round(answer_right[i][2]));
+            draw_line(color, start, end);
+        }
     }
 }
 void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
 {
-
+    // interpolate(glm::vec3 a, glm::vec3 b, int gap)
     int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 to = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
-
-    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
-
-    from = glm::vec3(v2.x, v2.y, 1);
-    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
-
-    for (int i = 0; i < gap + 1; i++)
+    if (gap > 0)
     {
-        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
-        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
-        draw_line(color, start, end);
+        glm::vec3 from = glm::vec3(v3.x, v3.y, v3.depth);
+        glm::vec3 to = glm::vec3(v1.x, v1.y, v1.depth);
+
+        glm::vec3 *answer_left = new glm::vec3[gap];
+        answer_left = interpolate(from, to, gap);
+
+        to = glm::vec3(v2.x, v2.y, v2.depth);
+        glm::vec3 *answer_right = new glm::vec3[gap];
+        answer_right = interpolate(from, to, gap);
+
+        for (int i = 0; i < gap; i++)
+        {
+            CanvasPoint start = CanvasPoint(int(answer_left[i][0]), round(answer_left[i][1]), round(answer_left[i][2]));
+            CanvasPoint end = CanvasPoint(int(answer_right[i][0]), round(answer_right[i][1]), round(answer_right[i][2]));
+            draw_line(color, start, end);
+        }
     }
 }
-void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
+void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour colour)
 {
-
     if (vt2.y == vt3.y)
     {
-        fillBottomFlatTriangle(vt1, vt2, vt3, color);
+        fillBottomFlatTriangle(vt1, vt2, vt3, colour);
     }
     else if (vt1.y == vt2.y)
     {
-        fillTopFlatTriangle(vt1, vt2, vt3, color);
+        fillTopFlatTriangle(vt1, vt2, vt3, colour);
     }
     else
     {
         CanvasPoint v4 = CanvasPoint(
-            (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))), vt2.y);
-        fillBottomFlatTriangle(vt1, vt2, v4, color);
-        fillTopFlatTriangle(vt2, v4, vt3, color);
+            (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))),
+            vt2.y,
+            (vt1.depth + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.depth - vt1.depth))));
+        fillBottomFlatTriangle(vt1, vt2, v4, colour);
+        fillTopFlatTriangle(vt2, v4, vt3, colour);
+        incomingDepth[int(round(v4.x + (WIDTH / 2)))][int(round(v4.y + (HEIGHT / 1.3)))] = v4.depth;
+        setPixelColour_(round(v4.x + (WIDTH / 2)), round(v4.y + (HEIGHT / 1.3)), colour);
     }
+    draw_line(colour, vt1, vt3);
+    draw_line(colour, vt2, vt3);
+    draw_line(colour, vt1, vt2);
+
+    incomingDepth[int(round(vt1.x + (WIDTH / 2)))][int(round(vt1.y + (HEIGHT / 1.3)))] = vt1.depth;
+    incomingDepth[int(round(vt2.x + (WIDTH / 2)))][int(round(vt2.y + (HEIGHT / 1.3)))] = vt2.depth;
+    incomingDepth[int(round(vt3.x + (WIDTH / 2)))][int(round(vt3.y + (HEIGHT / 1.3)))] = vt3.depth;
+
+    setPixelColour_(round(vt1.x + (WIDTH / 2)), round(vt1.y + (HEIGHT / 1.3)), colour);
+    setPixelColour_(round(vt2.x + (WIDTH / 2)), round(vt2.y + (HEIGHT / 1.3)), colour);
+    setPixelColour_(round(vt3.x + (WIDTH / 2)), round(vt3.y + (HEIGHT / 1.3)), colour);
 }
 
 std::vector<std::string> split(std::string str, char delimiter)
@@ -325,12 +421,12 @@ std::map<int, std::string> load_colour(std::string filename)
 glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
 {
     // rotate by x-axis
-    // glm::vec3 new_cam_position = cameraPosition;
+    glm::vec3 new_cam_position = cameraPosition;
     if (angle_x != 0)
     {
         glm::mat3 rotationMatrix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0, cos(angle_x), -sin(angle_x)),
                                  glm::vec3(0.0, sin(angle_x), cos(angle_x)));
-        cameraPosition = cameraPosition * rotationMatrix;
+        new_cam_position = cameraPosition * rotationMatrix;
     }
 
     if (angle_y != 0)
@@ -338,60 +434,62 @@ glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
         // rotate by y-axis
         glm::mat3 rotationMatrix(glm::vec3(cos(angle_y), 0.0, sin(angle_y)), glm::vec3(0.0, 1.0, 0.0),
                                  glm::vec3(-sin(angle_y), 0.0, cos(angle_y)));
-        cameraPosition = cameraPosition * rotationMatrix;
+        new_cam_position = cameraPosition * rotationMatrix;
     }
-    return cameraPosition;
+    return new_cam_position;
 }
+
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth)
 {
     std::vector<CanvasTriangle> projected;
     int focal = 5 * SCALING;
     glm::vec3 cameraPosition = glm::vec3(0, 1, 3);
-    // cameraPosition = camera_rotation(0, 0, cameraPosition);
-    // cameraPosition[2] = cameraPosition[2] + 10;
+    cameraPosition = camera_rotation(0, 45, cameraPosition);
+    cameraPosition[2] = cameraPosition[2] + 3;
 
     for (ModelTriangle face : faces)
     {
-        face.vertices[0] = face.vertices[0] - cameraPosition;
-        face.vertices[1] = face.vertices[1] - cameraPosition;
-        face.vertices[2] = face.vertices[2] - cameraPosition;
+        face.vertices[0] = (face.vertices[0] - cameraPosition);
+        face.vertices[1] = (face.vertices[1] - cameraPosition);
+        face.vertices[2] = (face.vertices[2] - cameraPosition);
 
-        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1)), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1))),
-                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1)), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1))),
-                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1)))));
+        projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1)), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1)), face.vertices[0].z * -1),
+                                           CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1)), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1)), face.vertices[1].z * -1),
+                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1)), face.vertices[2].z * -1)));
     }
 
     return projected;
 }
 
-void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
+void draw_line(Colour colour, CanvasPoint start, CanvasPoint end)
 {
     float xDiff = end.x - start.x;
     float yDiff = end.y - start.y;
-
+    float zDiff = end.depth - start.depth;
     float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
     if (numberOfSteps > 0)
     {
         float xStepSize = xDiff / numberOfSteps;
         float yStepSize = yDiff / numberOfSteps;
+        float zStepSize = zDiff / numberOfSteps;
+
         for (float i = 0.0; i < numberOfSteps; i++)
         {
             float x = start.x + (xStepSize * i);
             float y = start.y + (yStepSize * i);
-            float red = line_colour.red;
-            float green = line_colour.green;
-            float blue = line_colour.blue;
-            uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-            window.setPixelColour(round((x) + (WIDTH / 2)), round((y) + (HEIGHT / 1.3)), colour);
+            float z = start.depth + (zStepSize * i);
+            int x_coord = round(x + (WIDTH / 2));
+            int y_coord = round(y + (HEIGHT / 1.3));
+            incomingDepth[x_coord][y_coord] = z;
+            setPixelColour_(round(x + (WIDTH / 2)), round(y + (HEIGHT / 1.3)), colour);
         }
     }
     else
     {
-        float red = line_colour.red;
-        float green = line_colour.green;
-        float blue = line_colour.blue;
-        uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-        window.setPixelColour(round((start.x) + (WIDTH / 2)), round((start.y) + (HEIGHT / 1.3)), colour);
+        int x_coord = round(start.x + (WIDTH / 2));
+        int y_coord = round(start.y + (HEIGHT / 1.3));
+        incomingDepth[x_coord][y_coord] = start.depth;
+        setPixelColour_(round(start.x + (WIDTH / 2)), round(start.y + (HEIGHT / 1.3)), colour);
     }
 }
 
@@ -429,12 +527,50 @@ void display_obj(std::string filename, float canvasDepth)
     {
         // stroke_triangle(triangles[i]);
         filled_triangle(triangles[i], mtls[face_mtl[i]]);
+        clearDepthBuffer("incoming");
+    }
+    //done painting current object, clear incoming depth array
+}
+
+void clearDepthBuffer(std::string bufferName)
+{
+    if (bufferName == "all")
+    {
+        for (int i = 0; i < WIDTH; i++)
+        {
+            for (int j = 0; j < HEIGHT; j++)
+            {
+                currentDepth[i][j] = std::numeric_limits<float>::max();
+                incomingDepth[i][j] = std::numeric_limits<float>::max();
+            }
+        }
+    }
+
+    if (bufferName == "incoming")
+    {
+        for (int i = 0; i < WIDTH; i++)
+        {
+            for (int j = 0; j < HEIGHT; j++)
+            {
+                incomingDepth[i][j] = std::numeric_limits<float>::max();
+            }
+        }
     }
 }
 
 int main(int argc, char *argv[])
 {
     SDL_Event event;
+
+    //initialise the buffers
+    for (int i = 0; i < WIDTH; i++)
+    {
+        currentDepth[i] = new float[HEIGHT];
+        incomingDepth[i] = new float[HEIGHT];
+    }
+    //initialise depth arrays to infinity
+    clearDepthBuffer("all");
+
     while (true)
     {
         // We MUST poll for events - otherwise the window will freeze !
