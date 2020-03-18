@@ -16,7 +16,8 @@
 #define HEIGHT 768
 void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, int depth);
 std::vector<std::string> split(std::string str, char delimiter);
-std::vector<ModelTriangle> load_obj(std::string filename);
+
+std::vector<ModelTriangle> load_obj(std::string filename, glm::vec3 cameraPosition);
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth);
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
 int indexofSmallestElement(float array[], int size);
@@ -27,6 +28,7 @@ void display_obj(std::string filename, float canvasDepth);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
 std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
+// Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction);
 Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
@@ -116,7 +118,7 @@ std::vector<std::string> split(std::string str, char delimiter)
 }
 
 // MLT = value from 0 to 1 so RGB = 255 * MLT value
-std::vector<ModelTriangle> load_obj(std::string filename)
+std::vector<ModelTriangle> load_obj(std::string filename, glm::vec3 cameraPosition)
 {
     //lines from obj file
     std::vector<glm::vec3> vs;
@@ -141,7 +143,7 @@ std::vector<ModelTriangle> load_obj(std::string filename)
             if (chunks[0] == "v")
             {
 
-                vs.push_back(glm::vec3(std::stof(chunks[1]), std::stof(chunks[2]), std::stof(chunks[3])));
+                vs.push_back(glm::vec3(std::stof(chunks[1]), std::stof(chunks[2]) * -1, std::stof(chunks[3]) * -1));
             }
 
             if (chunks[0] == "f")
@@ -157,6 +159,12 @@ std::vector<ModelTriangle> load_obj(std::string filename)
         faces.push_back(ModelTriangle(vs[f.x - 1], vs[f.y - 1], vs[f.z - 1], white));
     }
 
+    for (ModelTriangle triangle : faces)
+    {
+        triangle.vertices[0] = triangle.vertices[0] - cameraPosition;
+        triangle.vertices[1] = triangle.vertices[1] - cameraPosition;
+        triangle.vertices[1] = triangle.vertices[2] - cameraPosition;
+    }
     return faces;
 }
 
@@ -270,19 +278,14 @@ void handleEvent(SDL_Event event)
         std::cout << "MOUSE CLICKED" << std::endl;
 }
 
-void display_obj(std::string filename, float canvasDepth)
+void display_obj(std::vector<ModelTriangle> triangles, std::map<int, std::string> face_mtl, std::map<std::string, Colour> mtls, glm::vec3 cameraPosition)
 {
-    std::vector<ModelTriangle> triangles = load_obj(filename);
-    std::map<int, std::string> face_mtl = load_colour("cornell.obj");
-    std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
 
     for (int i = 0; i < triangles.size(); i++)
     {
         triangles[i].colour = mtls[face_mtl[i]];
     }
-    int focal = 5;
-
-    glm::vec3 cameraPosition = glm::vec3(0, 0, 4);
+    int focal = 2;
     // cameraPosition = camera_rotation(0, 0, cameraPosition);
     // cameraPosition[2] = cameraPosition[2] + 4;
 
@@ -290,12 +293,13 @@ void display_obj(std::string filename, float canvasDepth)
 }
 Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction)
 {
-    // how to loop through every point in that triangle?
+
     glm::vec3 closest_point = glm::vec3(0, 0, 0);
     ModelTriangle closest_triangle = triangles[0];
     float closest_t = 10000000000000.0;
     bool is_intersection = false;
     Colour black = Colour(0, 0, 0);
+    //loop through every triangle
     for (ModelTriangle triangle : triangles)
     {
         glm::vec3 e0 = triangle.vertices[1] - triangle.vertices[0];
@@ -303,9 +307,10 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         glm::vec3 SPVector = cameraPosition - triangle.vertices[0];
         glm::mat3 DEMatrix(-ray_direction, e0, e1);
         glm::vec3 possibleSolution = glm::inverse(DEMatrix) * SPVector;
-        float u = possibleSolution[0];
-        float v = possibleSolution[1];
-        float t = possibleSolution[2];
+        float t = possibleSolution[0];
+        float u = possibleSolution[1];
+        float v = possibleSolution[2];
+        // find the one that is closest
         if (t > 0)
         {
             if ((0.0 <= u <= 1.0) && (0.0 <= v <= 1.0) && (u + v <= 1))
@@ -328,21 +333,21 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
     {
         return black;
     }
-
-    // return RayTriangleIntersection(closest_point, closest_t, closest_triangle)
 }
 void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, int depth)
 {
-    //in image plane coordiantes
+    //loop through each pixel in image plane coordiantes
     for (int i = 0; i < WIDTH; i++)
     {
         for (int j = 0; j < HEIGHT; j++)
         {
-            float world_x = i - (WIDTH / 2);
-            float world_y = j - (HEIGHT / 2);
-
-            glm::vec3 image_plane_coord = glm::vec3(world_x, world_y, focal);
+            // pixel as a world coordiantes
+            float came_coord_x = i - (WIDTH / 2);
+            float came_coord_y = j - (HEIGHT / 2);
+            //calculate ray from camera to the pixel and normalize it
+            glm::vec3 image_plane_coord = glm::vec3(came_coord_x, came_coord_y, focal);
             glm::vec3 ray_direction = glm::normalize(image_plane_coord);
+            // get the colour from nearest triangle the ray intersects, if none then we draw black
             Colour line_colour = getClosestIntersection(cameraPosition, triangles, ray_direction);
             float red = line_colour.red;
             float green = line_colour.green;
@@ -355,6 +360,11 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
 int main(int argc, char *argv[])
 {
     SDL_Event event;
+    glm::vec3 cameraPosition = glm::vec3(0, 0, 5);
+    std::vector<ModelTriangle> triangles = load_obj("cornell.obj", cameraPosition);
+    std::map<int, std::string> face_mtl = load_colour("cornell.obj");
+    std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
+
     while (true)
     {
         // We MUST poll for events - otherwise the window will freeze !
@@ -362,7 +372,9 @@ int main(int argc, char *argv[])
         {
             handleEvent(event);
         }
-        display_obj("cornell.obj", 5);
+
+        //this is the function that does ray tracing
+        display_obj(triangles, face_mtl, mtls, cameraPosition);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
         window.renderFrame();
     }
