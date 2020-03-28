@@ -144,7 +144,7 @@ std::vector<ModelTriangle> load_obj(std::string filename)
             if (chunks[0] == "v")
             {
 
-                vs.push_back(glm::vec3(std::stof(chunks[1]), std::stof(chunks[2]), (1 / std::stof(chunks[3]))));
+                vs.push_back(glm::vec3(std::stof(chunks[1]), std::stof(chunks[2]) * -1, std::stof(chunks[3])));
             }
 
             if (chunks[0] == "f")
@@ -225,36 +225,6 @@ std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float dept
     std::vector<CanvasTriangle> projected;
     return projected;
 }
-
-void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
-{
-    float xDiff = end.x - start.x;
-    float yDiff = end.y - start.y;
-    float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
-    if (numberOfSteps > 0)
-    {
-        float xStepSize = xDiff / numberOfSteps;
-        float yStepSize = yDiff / numberOfSteps;
-        for (float i = 0.0; i < numberOfSteps; i++)
-        {
-            float x = start.x + (xStepSize * i);
-            float y = start.y + (yStepSize * i);
-            float red = line_colour.red;
-            float green = line_colour.green;
-            float blue = line_colour.blue;
-            uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-            window.setPixelColour(round(x + (WIDTH / 2)), round(y + (HEIGHT / 1.3)), colour);
-        }
-    }
-    else
-    {
-        float red = line_colour.red;
-        float green = line_colour.green;
-        float blue = line_colour.blue;
-        uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-        window.setPixelColour(round(start.x + (WIDTH / 2)), round(start.y + (HEIGHT / 1.3)), colour);
-    }
-}
 void handleEvent(SDL_Event event)
 {
     if (event.type == SDL_KEYDOWN)
@@ -279,6 +249,7 @@ void display_obj(std::vector<ModelTriangle> triangles, std::map<int, std::string
     {
         triangles[i].colour = mtls[face_mtl[i]];
     }
+    //equals to focal = 1
     int focal = -1;
     // cameraPosition = camera_rotation(0, 0, cameraPosition);
     // cameraPosition[2] = cameraPosition[2] + 4;
@@ -288,38 +259,88 @@ void display_obj(std::vector<ModelTriangle> triangles, std::map<int, std::string
 Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction)
 {
 
-    glm::vec3 closest_point = glm::vec3(0, 0, 0);
+    // glm::vec3 closest_point = glm::vec3(0, 0, 0);
     ModelTriangle closest_triangle = triangles[0];
     float closest_t = INFINITY;
-    bool is_intersection = false;
-    Colour black = Colour(0, 0, 0);
+    bool is_intersected = false;
+    Colour black = Colour(255, 255, 255);
     //loop through every triangle
     for (ModelTriangle triangle : triangles)
     {
-        glm::vec3 e0 = triangle.vertices[1] - triangle.vertices[0];
-        glm::vec3 e1 = triangle.vertices[2] - triangle.vertices[0];
-        glm::vec3 SPVector = cameraPosition - triangle.vertices[0];
-        glm::mat3 DEMatrix(-ray_direction, e0, e1);
-        glm::vec3 possibleSolution = glm::inverse(DEMatrix) * SPVector;
-        float t = possibleSolution[0];
-        float u = possibleSolution[1];
-        float v = possibleSolution[2];
-        // find the one that is closest
-        if (t > 0)
+        // compute plane's normal
+        glm::vec3 v0v1 = triangle.vertices[0] - triangle.vertices[1];
+        glm::vec3 v0v2 = triangle.vertices[2] - triangle.vertices[0];
+        // no need to normalize
+        glm::vec3 N = glm::cross(v0v1, v0v2); // N
+        // float area2 = N.length();
+
+        // Step 1: finding P
+
+        // check if ray and plane are parallel ?
+        float NdotRayDirection = glm::dot(N, ray_direction);
+        if (abs(NdotRayDirection) == 0)
         {
-            if ((0.0 <= u <= 1.0) && (0.0 <= v <= 1.0) && (u + v <= 1))
-            {
-                if (t < closest_t)
-                {
-                    is_intersection = true;
-                    closest_t = t;
-                    closest_triangle = triangle;
-                    closest_point = triangle.vertices[0] + (u * e0) + (v * e1);
-                }
-            }
+            continue;
+        }
+        // compute d parameter using equation 2
+        float d = glm::dot(N, triangle.vertices[0]);
+
+        // compute t (equation 3)
+        float t = (glm::dot(N, cameraPosition) + d) / NdotRayDirection;
+        // check if the triangle is in behind the ray
+        if (t < 0)
+        {
+            // the triangle is behind
+            continue;
+        }
+
+        // compute the intersection point using equation 1
+        glm::vec3 P = cameraPosition + t * ray_direction;
+
+        // Step 2: inside-outside test
+        glm::vec3 C; // vector perpendicular to triangle's plane
+
+        // edge 0
+        glm::vec3 edge0 = triangle.vertices[1] - triangle.vertices[0];
+        glm::vec3 vp0 = P - triangle.vertices[0];
+
+        glm::vec3 edge1 = triangle.vertices[2] - triangle.vertices[1];
+        glm::vec3 vp1 = P - triangle.vertices[1];
+
+        glm::vec3 edge2 = triangle.vertices[0] - triangle.vertices[2];
+        glm::vec3 vp2 = P - triangle.vertices[2];
+
+        C = glm::cross(edge0, vp0);
+        if (glm::dot(N, C) < 0)
+        {
+            is_intersected = false; // P is on the right side
+            continue;
+        }
+        // edge 1
+        C = glm::cross(edge1, vp1);
+        if (glm::dot(N, C) < 0)
+        {
+            is_intersected = false;
+            continue; // P is on the right side
+        }
+        // edge 2
+        C = glm::cross(edge2, vp2);
+        if (glm::dot(N, C) < 0)
+        {
+            is_intersected = false;
+            continue; // P is on the right side;
+        }
+        std::cout << "reached here ";
+        //still need to check distance
+        if (t < closest_t)
+        {
+            std::cout << "FOUND closest";
+            is_intersected = true;
+            closest_t = t;
+            closest_triangle = triangle;
         }
     }
-    if (is_intersection)
+    if (is_intersected)
     {
         return closest_triangle.colour;
     }
@@ -330,30 +351,38 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 }
 void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, int depth)
 {
-    // //loop through each pixel in image plane coordiantes
-    // for (int i = 0; i < WIDTH; i++)
+    float aspect_ratio = WIDTH / HEIGHT;
+    float fov = 1;
+    float scale = tan((fov * 0.5) * (M_PI / 180));
+
+    //sort triangles
+
+    // for (ModelTriangle triangle : triangles)
     // {
-    //     for (int j = 0; j < HEIGHT; j++)
+    //     glm::vec3 temp_vertices[3] = triangle.vertices;
+    //     glm::vec3 top, bottom, middle;
+    //     float least = INFINITY;
+    //     float least_index = 0;
+    //     for (int i = 0; i < 3; i++)
     //     {
-    //         // pixel as a world coordiantes
-    //         float came_coord_x = i - (WIDTH / 2);
-    //         float came_coord_y = j - (HEIGHT / 2);
-    //         //calculate ray from camera to the pixel and normalize it
-    //         glm::vec3 image_plane_coord = glm::vec3(came_coord_x, came_coord_y, focal);
-    //         glm::vec3 ray_direction = glm::normalize(image_plane_coord);
-    //         // get the colour from nearest triangle the ray intersects, if none then we draw black
-    //         Colour line_colour = getClosestIntersection(cameraPosition, triangles, ray_direction);
-    //         float red = line_colour.red;
-    //         float green = line_colour.green;
-    //         float blue = line_colour.blue;
-    //         uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-    //         window.setPixelColour(i, j, colour);
+    //         if (triangle.vertices[i][1] < least)
+    //         {
+    //             least_index = i;
+    //             least = triangle.vertices[i][1];
+    //         }
+    //     }
+
+    //     float max = 0;
+    //     float max_index = 0;
+    //     for (int i = 0; i < 3; i++)
+    //     {
+    //         if (triangle.vertices[i][1] > max)
+    //         {
+    //             max_index = i;
+    //             least = triangle.vertices[i][1];
+    //         }
     //     }
     // }
-
-    float aspect_ratio = WIDTH / HEIGHT;
-    float fov = 10;
-    float scale = tan((fov * 0.5) * (M_PI / 180));
 
     //loop through each pixel in image plane coordiantes
     for (int i = 0; i < WIDTH; i++)
@@ -379,7 +408,7 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
 int main(int argc, char *argv[])
 {
     SDL_Event event;
-    glm::vec3 cameraPosition = glm::vec3(0, 0, (HEIGHT / 2));
+    glm::vec3 cameraPosition = glm::vec3(0, 0, 0);
     std::vector<ModelTriangle> triangles = load_obj("cornell.obj");
     std::map<int, std::string> face_mtl = load_colour("cornell.obj");
     std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
