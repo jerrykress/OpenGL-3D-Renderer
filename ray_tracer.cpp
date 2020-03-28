@@ -274,7 +274,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 
     glm::vec3 closest_point = glm::vec3(0, 0, 0);
     ModelTriangle closest_triangle = triangles[0];
-    float closest_t = INFINITY;
+    float closest_t = FLT_MAX;
     bool is_intersection = false;
     Colour black = Colour(0, 0, 0);
     //loop through every triangle
@@ -351,12 +351,12 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
             float x = (2 * ((i + 0.5) / WIDTH) - 1) * aspect_ratio * scale;
             float y = (1 - (2 * ((j + 0.5) / HEIGHT))) * scale;
             //calculate ray from camera to the pixel and normalize it
-            glm::vec3 ray_direction_unnorm = glm::vec3(x, y, focal);
+            glm::vec3 pixel_pos_local = glm::vec3(x, y, focal);
             //transform the vectors with the translation vector
             glm::vec3 cam_position_transformed = ts_vector + cameraPosition;
-            glm::vec3 ray_direction_world = ts_vector + ray_direction_unnorm;
+            glm::vec3 pixel_pos_world = ts_vector + pixel_pos_local;
             //generate and normalize ray direction
-            glm::vec3 ray_direction = glm::normalize(ray_direction_world - cam_position_transformed);
+            glm::vec3 ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
             // get the colour from nearest triangle the ray intersects, if none then we draw black
             Colour line_colour = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
             // output to screen
