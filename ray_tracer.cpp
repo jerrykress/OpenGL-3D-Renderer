@@ -35,22 +35,6 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 
-std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size)
-{
-    std::vector<glm::vec3> l;
-    float t = (1.0 / float(size));
-    float t_iter = 0;
-    for (int i = 0; i < size + 1; i++)
-    {
-        l.push_back((from * glm::vec3(1 - t_iter,
-                                      1 - t_iter,
-                                      1 - t_iter)) +
-                    to * glm::vec3(t_iter, t_iter, t_iter));
-        t_iter = t * i;
-    }
-    return l;
-}
-
 std::map<std::string, Colour> load_mtl(std::string filename)
 {
     //metadata
@@ -144,7 +128,7 @@ std::vector<ModelTriangle> load_obj(std::string filename)
             if (chunks[0] == "v")
             {
 
-                vs.push_back(glm::vec3(std::stof(chunks[1]), std::stof(chunks[2]), (1 / std::stof(chunks[3]))));
+                vs.push_back(glm::vec3(std::stof(chunks[1]), std::stof(chunks[2]), float(1 / std::stof(chunks[3]))));
             }
 
             if (chunks[0] == "f")
@@ -296,6 +280,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
     //loop through every triangle
     for (ModelTriangle triangle : triangles)
     {
+
         glm::vec3 e0 = triangle.vertices[1] - triangle.vertices[0];
         glm::vec3 e1 = triangle.vertices[2] - triangle.vertices[0];
         glm::vec3 SPVector = cameraPosition - triangle.vertices[0];
@@ -351,8 +336,10 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
     //     }
     // }
 
+    // transformation vector by translation only
+    glm::vec3 ts_vector = glm::vec3(0, 2.5, 3);
     float aspect_ratio = WIDTH / HEIGHT;
-    float fov = 10;
+    float fov = 90;
     float scale = tan((fov * 0.5) * (M_PI / 180));
 
     //loop through each pixel in image plane coordiantes
@@ -364,10 +351,15 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
             float x = (2 * ((i + 0.5) / WIDTH) - 1) * aspect_ratio * scale;
             float y = (1 - (2 * ((j + 0.5) / HEIGHT))) * scale;
             //calculate ray from camera to the pixel and normalize it
-            glm::vec3 image_plane_coord = glm::vec3(x, y, focal);
-            glm::vec3 ray_direction = glm::normalize(image_plane_coord);
+            glm::vec3 ray_direction_unnorm = glm::vec3(x, y, focal);
+            //transform the vectors with the translation vector
+            glm::vec3 cam_position_transformed = ts_vector + cameraPosition;
+            glm::vec3 ray_direction_world = ts_vector + ray_direction_unnorm;
+            //generate and normalize ray direction
+            glm::vec3 ray_direction = glm::normalize(ray_direction_world - cam_position_transformed);
             // get the colour from nearest triangle the ray intersects, if none then we draw black
-            Colour line_colour = getClosestIntersection(cameraPosition, triangles, ray_direction);
+            Colour line_colour = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
+            // output to screen
             float red = line_colour.red;
             float green = line_colour.green;
             float blue = line_colour.blue;
@@ -379,7 +371,7 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
 int main(int argc, char *argv[])
 {
     SDL_Event event;
-    glm::vec3 cameraPosition = glm::vec3(0, 0, (HEIGHT / 2));
+    glm::vec3 cameraPosition = glm::vec3(0, 0, 0);
     std::vector<ModelTriangle> triangles = load_obj("cornell.obj");
     std::map<int, std::string> face_mtl = load_colour("cornell.obj");
     std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
