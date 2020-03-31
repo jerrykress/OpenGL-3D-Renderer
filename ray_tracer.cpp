@@ -274,26 +274,32 @@ void display_obj(std::vector<ModelTriangle> triangles, std::map<int, std::string
 
     intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix);
 }
+float distance_of_vectors(glm::vec3 start, glm::vec3 end)
+{
+    return sqrt(pow(end.x - start.x, 2.0) + pow(end.y - start.y, 2.0) + pow(end.z - start.z, 2.0));
+}
 Colour proximity_lighting(ModelTriangle triangle)
 {
-    glm::vec3 light_source = glm::vec3(0, 5.33, -5);
+
+    glm::vec3 light_source = glm::vec3(-0.234, 5.2185, -3.04);
     glm::vec3 A = triangle.vertices[1] - triangle.vertices[0];
     glm::vec3 B = triangle.vertices[2] - triangle.vertices[0];
-    glm::vec3 triangle_normal = glm::normalize(glm::cross(A, B));
+    glm::vec3 cross = glm::cross(B, A);
+    glm::vec3 triangle_normal = glm::normalize(cross);
+    // glm::vec3 average_vertices = (triangle.vertices[0] + triangle.vertices[1] + triangle.vertices[2]);
+    // average_vertices = glm::vec3(float(average_vertices.x / 3), float(average_vertices.y / 3), float(average_vertices.z / 3));
     glm::vec3 surface_to_lightsource = triangle.vertices[0] - light_source;
-    float dot_product = glm::dot(surface_to_lightsource, triangle_normal);
-    if (dot_product > 0 && dot_product < 90)
+    float dot_product = glm::dot(triangle_normal, surface_to_lightsource);
+    if ((dot_product > 0) && (dot_product < 90))
     {
-        //distance r
-        float r = glm::distance(triangle.vertices[0], light_source);
-
+        // distance r
+        float r = distance_of_vectors(triangle.vertices[0], light_source);
         float power = pow(r, 2);
-        double coefficient = 1.0 / (4.0 * M_PI * (double(power)));
-        // std::cout << coefficient << "\n";
-        double red = double(triangle.colour.red) * coefficient;
-        double green = double(triangle.colour.green) * coefficient;
-        double blue = double(triangle.colour.blue) * coefficient;
-        // std::cout << red << " " << green << " " << blue << " \n";
+        float coefficient = (200.0 * dot_product) / (4.0 * M_PI * power);
+
+        float red = float(triangle.colour.red) * coefficient;
+        float green = float(triangle.colour.green) * coefficient;
+        float blue = float(triangle.colour.blue) * coefficient;
         // return triangle.colour;
         return Colour(int(red), int(green), int(blue));
     }

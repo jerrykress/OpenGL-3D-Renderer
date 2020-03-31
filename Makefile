@@ -1,4 +1,4 @@
-PROJECT_NAME = ray_tracer
+PROJECT_NAME = cbox_filled_color
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp
