@@ -278,7 +278,7 @@ float distance_of_vectors(glm::vec3 start, glm::vec3 end)
 {
     return sqrt(pow(end.x - start.x, 2.0) + pow(end.y - start.y, 2.0) + pow(end.z - start.z, 2.0));
 }
-Colour proximity_lighting(ModelTriangle triangle)
+Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point)
 {
 
     glm::vec3 light_source = glm::vec3(-0.234, 5.2185, -3.04);
@@ -288,15 +288,22 @@ Colour proximity_lighting(ModelTriangle triangle)
     glm::vec3 triangle_normal = glm::normalize(cross);
     // glm::vec3 average_vertices = (triangle.vertices[0] + triangle.vertices[1] + triangle.vertices[2]);
     // average_vertices = glm::vec3(float(average_vertices.x / 3), float(average_vertices.y / 3), float(average_vertices.z / 3));
-    glm::vec3 surface_to_lightsource = triangle.vertices[0] - light_source;
+    glm::vec3 surface_to_lightsource = intersection_point - light_source;
     float dot_product = glm::dot(triangle_normal, surface_to_lightsource);
     if ((dot_product > 0) && (dot_product < 90))
     {
         // distance r
-        float r = distance_of_vectors(triangle.vertices[0], light_source);
+        float r = distance_of_vectors(intersection_point, light_source);
         float power = pow(r, 2);
-        float coefficient = (200.0 * dot_product) / (4.0 * M_PI * power);
-
+        float coefficient = (10.0) / (power);
+        if (coefficient > 1)
+        {
+            coefficient = 1;
+        }
+        else if (coefficient < 0)
+        {
+            coefficient = 0;
+        }
         float red = float(triangle.colour.red) * coefficient;
         float green = float(triangle.colour.green) * coefficient;
         float blue = float(triangle.colour.blue) * coefficient;
@@ -352,7 +359,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         //2. calculate distance t from light source
         // receiving light at distance A = 1 / (4 * M_PI * sqrt(t))
         //3. times the RGB value by [0,1]
-        Colour output_colour = proximity_lighting(closest_triangle);
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point);
         return output_colour;
     }
     else
