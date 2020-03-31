@@ -15,7 +15,7 @@
 #define WIDTH 320
 #define HEIGHT 240
 #define SCALING 20
-void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, int depth);
+void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, glm::mat3 rotation_matrix);
 std::vector<std::string> split(std::string str, char delimiter);
 
 std::vector<ModelTriangle> load_obj(std::string filename);
@@ -128,7 +128,7 @@ std::vector<ModelTriangle> load_obj(std::string filename)
             if (chunks[0] == "v")
             {
 
-                vs.push_back(glm::vec3(std::stof(chunks[1]), std::stof(chunks[2]), float(1 / std::stof(chunks[3]))));
+                vs.push_back(glm::vec3(std::stof(chunks[1]), std::stof(chunks[2]), std::stof(chunks[3])));
             }
 
             if (chunks[0] == "f")
@@ -184,25 +184,29 @@ std::map<int, std::string> load_colour(std::string filename)
     return face_mtl;
 }
 
-glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
+glm::mat3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
 {
     // rotate by x-axis
-    glm::vec3 new_cam_position = cameraPosition;
-    if (angle_x != 0)
+    double angle_x_convert = angle_x * M_PI / 180;
+    double angle_y_convert = angle_y * (M_PI / 180);
+
+    glm::mat3 final_rotation_matrix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0), glm::vec3(0.0, 0.0, 1.0));
+
+    if (angle_x_convert != 0)
     {
         glm::mat3 rotationMatrix(glm::vec3(1.0, 0.0, 0.0), glm::vec3(0, cos(angle_x), -sin(angle_x)),
                                  glm::vec3(0.0, sin(angle_x), cos(angle_x)));
-        new_cam_position = cameraPosition * rotationMatrix;
+        final_rotation_matrix = final_rotation_matrix * rotationMatrix;
     }
 
-    if (angle_y != 0)
+    if (angle_y_convert != 0)
     {
         // rotate by y-axis
         glm::mat3 rotationMatrix(glm::vec3(cos(angle_y), 0.0, sin(angle_y)), glm::vec3(0.0, 1.0, 0.0),
                                  glm::vec3(-sin(angle_y), 0.0, cos(angle_y)));
-        new_cam_position = cameraPosition * rotationMatrix;
+        final_rotation_matrix = final_rotation_matrix * rotationMatrix;
     }
-    return new_cam_position;
+    return final_rotation_matrix;
 }
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth)
 {
@@ -263,17 +267,48 @@ void display_obj(std::vector<ModelTriangle> triangles, std::map<int, std::string
     {
         triangles[i].colour = mtls[face_mtl[i]];
     }
-    int focal = -1;
-    // cameraPosition = camera_rotation(0, 0, cameraPosition);
+    int focal = -2;
+    //input as degress -> converter inside function
+    glm::mat3 final_rotation_matrix = camera_rotation(0, 0, cameraPosition);
     // cameraPosition[2] = cameraPosition[2] + 4;
 
-    intersection_on_pixel(cameraPosition, triangles, focal, 0);
+    intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix);
+}
+Colour proximity_lighting(ModelTriangle triangle)
+{
+    glm::vec3 light_source = glm::vec3(0, 5.33, -5);
+    glm::vec3 A = triangle.vertices[1] - triangle.vertices[0];
+    glm::vec3 B = triangle.vertices[2] - triangle.vertices[0];
+    glm::vec3 triangle_normal = glm::normalize(glm::cross(A, B));
+    glm::vec3 surface_to_lightsource = triangle.vertices[0] - light_source;
+    float dot_product = glm::dot(surface_to_lightsource, triangle_normal);
+    if (dot_product > 0 && dot_product < 90)
+    {
+        //distance r
+        float r = glm::distance(triangle.vertices[0], light_source);
+
+        float power = pow(r, 2);
+        double coefficient = 1.0 / (4.0 * M_PI * (double(power)));
+        // std::cout << coefficient << "\n";
+        double red = double(triangle.colour.red) * coefficient;
+        double green = double(triangle.colour.green) * coefficient;
+        double blue = double(triangle.colour.blue) * coefficient;
+        // std::cout << red << " " << green << " " << blue << " \n";
+        // return triangle.colour;
+        return Colour(int(red), int(green), int(blue));
+    }
+    else
+    {
+        return Colour(0, 0, 0);
+    };
 }
 Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction)
 {
 
     glm::vec3 closest_point = glm::vec3(0, 0, 0);
     ModelTriangle closest_triangle = triangles[0];
+    // glm::vec3 light_source = (0, -0.5, -0.7);
+
     float closest_t = FLT_MAX;
     bool is_intersection = false;
     Colour black = Colour(0, 0, 0);
@@ -292,7 +327,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         // find the one that is closest
         if (t > 0)
         {
-            if ((0.0 <= u <= 1.0) && (0.0 <= v <= 1.0) && (u + v <= 1))
+            if ((0.0 <= u) && (u <= 1.0) && (0.0 <= v) && (v <= 1.0) && (u + v <= 1))
             {
                 if (t < closest_t)
                 {
@@ -304,40 +339,25 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
             }
         }
     }
+
     if (is_intersection)
     {
-        return closest_triangle.colour;
+        //1. calculate normal of the triangle
+        //2. calculate distance t from light source
+        // receiving light at distance A = 1 / (4 * M_PI * sqrt(t))
+        //3. times the RGB value by [0,1]
+        Colour output_colour = proximity_lighting(closest_triangle);
+        return output_colour;
     }
     else
     {
         return black;
     }
 }
-void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, int depth)
+void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, glm::mat3 rotation_matrix)
 {
-    // //loop through each pixel in image plane coordiantes
-    // for (int i = 0; i < WIDTH; i++)
-    // {
-    //     for (int j = 0; j < HEIGHT; j++)
-    //     {
-    //         // pixel as a world coordiantes
-    //         float came_coord_x = i - (WIDTH / 2);
-    //         float came_coord_y = j - (HEIGHT / 2);
-    //         //calculate ray from camera to the pixel and normalize it
-    //         glm::vec3 image_plane_coord = glm::vec3(came_coord_x, came_coord_y, focal);
-    //         glm::vec3 ray_direction = glm::normalize(image_plane_coord);
-    //         // get the colour from nearest triangle the ray intersects, if none then we draw black
-    //         Colour line_colour = getClosestIntersection(cameraPosition, triangles, ray_direction);
-    //         float red = line_colour.red;
-    //         float green = line_colour.green;
-    //         float blue = line_colour.blue;
-    //         uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-    //         window.setPixelColour(i, j, colour);
-    //     }
-    // }
-
     // transformation vector by translation only
-    glm::vec3 ts_vector = glm::vec3(0, 2.5, 3);
+    glm::vec3 ts_vector = glm::vec3(0, 2, 3.5);
     float aspect_ratio = WIDTH / HEIGHT;
     float fov = 90;
     float scale = tan((fov * 0.5) * (M_PI / 180));
@@ -353,8 +373,8 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
             //calculate ray from camera to the pixel and normalize it
             glm::vec3 pixel_pos_local = glm::vec3(x, y, focal);
             //transform the vectors with the translation vector
-            glm::vec3 cam_position_transformed = ts_vector + cameraPosition;
-            glm::vec3 pixel_pos_world = ts_vector + pixel_pos_local;
+            glm::vec3 cam_position_transformed = (ts_vector + cameraPosition) * rotation_matrix;
+            glm::vec3 pixel_pos_world = (ts_vector + pixel_pos_local) * rotation_matrix;
             //generate and normalize ray direction
             glm::vec3 ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
             // get the colour from nearest triangle the ray intersects, if none then we draw black
