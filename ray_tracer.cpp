@@ -278,10 +278,59 @@ float distance_of_vectors(glm::vec3 start, glm::vec3 end)
 {
     return sqrt(pow(end.x - start.x, 2.0) + pow(end.y - start.y, 2.0) + pow(end.z - start.z, 2.0));
 }
-Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point)
+bool shadow_detector(glm::vec3 light_source, std::vector<ModelTriangle> triangles, glm::vec3 intersection_point, ModelTriangle current_triangle)
+{
+    float closest_t = FLT_MAX;
+    bool is_intersection = false;
+    glm::vec3 closest_point = glm::vec3(0, 0, 0);
+    glm::vec3 ray_direction = glm::normalize(light_source - intersection_point);
+    float inter_to_light = distance_of_vectors(light_source, intersection_point);
+    //loop through every triangle
+    for (ModelTriangle triangle : triangles)
+    {
+        if ((triangle.vertices[0] != current_triangle.vertices[0]) && (triangle.vertices[1] != current_triangle.vertices[1]) && (triangle.vertices[2] != current_triangle.vertices[2]))
+        {
+            glm::vec3 e0 = triangle.vertices[1] - triangle.vertices[0];
+            glm::vec3 e1 = triangle.vertices[2] - triangle.vertices[0];
+            glm::vec3 SPVector = intersection_point - triangle.vertices[0];
+            glm::mat3 DEMatrix(-ray_direction, e0, e1);
+            glm::vec3 possibleSolution = glm::inverse(DEMatrix) * SPVector;
+            float t = possibleSolution[0];
+            float u = possibleSolution[1];
+            float v = possibleSolution[2];
+            // find the one that is closest
+            if (t > 0)
+            {
+                if ((0.0 <= u) && (u <= 1.0) && (0.0 <= v) && (v <= 1.0) && (u + v <= 1))
+                {
+                    if (t < closest_t)
+                    {
+                        is_intersection = true;
+                        closest_t = t;
+                        closest_point = triangle.vertices[0] + (u * e0) + (v * e1);
+                    }
+                }
+            }
+        }
+    }
+    if (is_intersection == true)
+    {
+        float closest_to_inter = distance_of_vectors(intersection_point, closest_point);
+        if ((closest_to_inter < inter_to_light) && (inter_to_light > 4))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    return is_intersection;
+}
+Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, glm::vec3 light_source)
 {
 
-    glm::vec3 light_source = glm::vec3(-0.234, 5.2185, -3.04);
     glm::vec3 A = triangle.vertices[1] - triangle.vertices[0];
     glm::vec3 B = triangle.vertices[2] - triangle.vertices[0];
     glm::vec3 cross = glm::cross(B, A);
@@ -295,13 +344,18 @@ Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point)
         // distance r
         float r = distance_of_vectors(intersection_point, light_source);
         float power = pow(r, 2);
-        float coefficient = (10.0) / (power);
+        // includes angle of incidence
+        float coefficient = (100.0 * dot_product) / (4 * M_PI * power);
+
+        //does not include angle of incidence
+        // float coefficient = 10.0 / (power);
         if (coefficient > 1)
         {
             coefficient = 1;
         }
         else if (coefficient < 0)
         {
+            //ambieng lighting - Turned off for now
             coefficient = 0;
         }
         float red = float(triangle.colour.red) * coefficient;
@@ -320,7 +374,6 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 
     glm::vec3 closest_point = glm::vec3(0, 0, 0);
     ModelTriangle closest_triangle = triangles[0];
-    // glm::vec3 light_source = (0, -0.5, -0.7);
 
     float closest_t = FLT_MAX;
     bool is_intersection = false;
@@ -355,11 +408,13 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 
     if (is_intersection)
     {
-        //1. calculate normal of the triangle
-        //2. calculate distance t from light source
-        // receiving light at distance A = 1 / (4 * M_PI * sqrt(t))
-        //3. times the RGB value by [0,1]
-        Colour output_colour = proximity_lighting(closest_triangle, closest_point);
+        glm::vec3 light_source = glm::vec3(-0.234, 4.5, -2.04);
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_source);
+        bool shadow_detection = shadow_detector(light_source, triangles, closest_point, closest_triangle);
+        if (shadow_detection == true)
+        {
+            return black;
+        }
         return output_colour;
     }
     else
@@ -392,6 +447,8 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
             glm::vec3 ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
             // get the colour from nearest triangle the ray intersects, if none then we draw black
             Colour line_colour = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
+            // tracing shadows
+
             // output to screen
             float red = line_colour.red;
             float green = line_colour.green;
