@@ -373,6 +373,27 @@ Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, 
         return Colour(0, 0, 0);
     };
 }
+
+
+Colour specular_lighting (ModelTriangle triangle, glm::vec3 intersection_point, glm::vec3 camera_position, glm::vec3 light_source, bool is_shadow){
+    glm::vec3 entry_ray        = glm::normalize(intersection_point - light_source);
+    glm::vec3 triangle_normal  = (glm::dot(triangle.normal, entry_ray) <= 0) ? (triangle.normal) : (triangle.normal * -1.0f);
+    glm::vec3 observation_ray  = glm::normalize(camera_position - intersection_point);
+    glm::vec3 reflection_ray   = glm::normalize(entry_ray - float(2) * glm::dot(triangle_normal, entry_ray) * triangle_normal);
+
+    float specular_coefficient = glm::dot(observation_ray, reflection_ray);
+
+    specular_coefficient = (specular_coefficient > 1) ? (1) : (specular_coefficient);
+    specular_coefficient = (specular_coefficient < 0) ? (0) : (specular_coefficient);
+
+    float r = (is_shadow) ? (float(triangle.colour.red)   * 0.2) : (float(triangle.colour.red)   * specular_coefficient);
+    float g = (is_shadow) ? (float(triangle.colour.green) * 0.2) : (float(triangle.colour.green) * specular_coefficient);
+    float b = (is_shadow) ? (float(triangle.colour.blue)  * 0.2) : (float(triangle.colour.blue)  * specular_coefficient);
+
+    return Colour(int(r), int(g), int(b));
+}
+
+
 Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction)
 {
 
@@ -420,7 +441,8 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         // }
         // else
         // {
-        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_source, shadow_detection);
+        // Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_source, shadow_detection);
+        Colour output_colour = specular_lighting(closest_triangle, closest_point, cameraPosition, light_source, shadow_detection);
         return output_colour;
         // }
     }
@@ -468,7 +490,7 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
 int main(int argc, char *argv[])
 {
     SDL_Event event;
-    glm::vec3 cameraPosition = glm::vec3(0, 0, 0);
+    glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
     std::vector<ModelTriangle> triangles = load_obj("cornell.obj");
     std::map<int, std::string> face_mtl = load_colour("cornell.obj");
     std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
