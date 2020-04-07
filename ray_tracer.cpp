@@ -25,7 +25,7 @@ int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color);
 void filled_triangle(CanvasTriangle triangle, Colour tri_color);
-void display_obj(std::string filename, float canvasDepth);
+void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
 std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
@@ -34,6 +34,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
+std::vector<ModelTriangle> allTriangles;
 
 std::map<std::string, Colour> load_mtl(std::string filename)
 {
@@ -260,13 +261,8 @@ void handleEvent(SDL_Event event)
         std::cout << "MOUSE CLICKED" << std::endl;
 }
 
-void display_obj(std::vector<ModelTriangle> triangles, std::map<int, std::string> face_mtl, std::map<std::string, Colour> mtls, glm::vec3 cameraPosition)
+void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
 {
-
-    for (int i = 0; i < triangles.size(); i++)
-    {
-        triangles[i].colour = mtls[face_mtl[i]];
-    }
     int focal = -2;
     //input as degress -> converter inside function
     glm::mat3 final_rotation_matrix = camera_rotation(0, 0, cameraPosition);
@@ -487,13 +483,27 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
         }
     }
 }
+
+void read_obj(std::string objFile, std::string mtlFile){
+    std::vector<ModelTriangle> triangles = load_obj(objFile);
+    std::map<int, std::string> face_mtl = load_colour(objFile);
+    std::map<std::string, Colour> mtls = load_mtl(mtlFile);
+
+    for (int i = 0; i < triangles.size(); i++)
+    {
+        triangles[i].colour = mtls[face_mtl[i]];
+        allTriangles.push_back(triangles[i]);
+    }
+}
+
+
 int main(int argc, char *argv[])
 {
     SDL_Event event;
     glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
-    std::vector<ModelTriangle> triangles = load_obj("cornell.obj");
-    std::map<int, std::string> face_mtl = load_colour("cornell.obj");
-    std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
+
+    //Read all objects here before calling display below
+    read_obj("cornell.obj", "cornell-box.mtl");
 
     while (true)
     {
@@ -504,7 +514,7 @@ int main(int argc, char *argv[])
         }
 
         //this is the function that does ray tracing
-        display_obj(triangles, face_mtl, mtls, cameraPosition);
+        display_obj(allTriangles, cameraPosition);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
         window.renderFrame();
     }
