@@ -410,7 +410,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         float near_plane = 0.0;
         // basic culling
         // 1. back-face
-        if (glm::dot(N, ray_direction) < 0)
+        if (glm::dot(ray_direction, N) < 0)
         {
             glm::vec3 SPVector = cameraPosition - triangle.vertices[0];
             glm::mat3 DEMatrix(-ray_direction, e0, e1);
@@ -471,7 +471,7 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
         {
             //anti -aliasing
 
-            float x = (2 * ((i + 0.5) / WIDTH) - 1) * aspect_ratio * scale;
+            float x = (2 * ((i + 0.25) / WIDTH) - 1) * aspect_ratio * scale;
             float y = (1 - (2 * ((j + 0.5) / HEIGHT))) * scale;
             //calculate ray from camera to the pixel and normalize it
             glm::vec3 pixel_pos_local = glm::vec3(x, y, focal);
@@ -482,53 +482,53 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
             glm::vec3 ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
             // get the colour from nearest triangle the ray intersects, if none then we draw black
             Colour line_colour = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
-            float red = line_colour.red;
-            float green = line_colour.green;
-            float blue = line_colour.blue;
+            // float red = line_colour.red;
+            // float green = line_colour.green;
+            // float blue = line_colour.blue;
 
-            // x = (2 * ((i + 0.5) / WIDTH) - 1) * aspect_ratio * scale;
-            // y = (1 - (2 * ((j + 0.75) / HEIGHT))) * scale;
-            // //calculate ray from camera to the pixel and normalize it
-            // pixel_pos_local = glm::vec3(x, y, focal);
-            // //transform the vectors with the translation vector
-            // cam_position_transformed = (ts_vector + cameraPosition) * rotation_matrix;
-            // pixel_pos_world = (ts_vector + pixel_pos_local) * rotation_matrix;
-            // //generate and normalize ray direction
-            // ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
-            // // get the colour from nearest triangle the ray intersects, if none then we draw black
-            // Colour line_colour2 = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
-            // // tracing shadows
+            x = (2 * ((i + 0.5) / WIDTH) - 1) * aspect_ratio * scale;
+            y = (1 - (2 * ((j + 0.75) / HEIGHT))) * scale;
+            //calculate ray from camera to the pixel and normalize it
+            pixel_pos_local = glm::vec3(x, y, focal);
+            //transform the vectors with the translation vector
+            cam_position_transformed = (ts_vector + cameraPosition) * rotation_matrix;
+            pixel_pos_world = (ts_vector + pixel_pos_local) * rotation_matrix;
+            //generate and normalize ray direction
+            ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
+            // get the colour from nearest triangle the ray intersects, if none then we draw black
+            Colour line_colour2 = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
+            // tracing shadows
 
-            // x = (2 * ((i + 0.75) / WIDTH) - 1) * aspect_ratio * scale;
-            // y = (1 - (2 * ((j + 0.5) / HEIGHT))) * scale;
-            // //calculate ray from camera to the pixel and normalize it
-            // pixel_pos_local = glm::vec3(x, y, focal);
-            // //transform the vectors with the translation vector
-            // cam_position_transformed = (ts_vector + cameraPosition) * rotation_matrix;
-            // pixel_pos_world = (ts_vector + pixel_pos_local) * rotation_matrix;
-            // //generate and normalize ray direction
-            // ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
-            // // get the colour from nearest triangle the ray intersects, if none then we draw black
-            // Colour line_colour3 = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
-            // // tracing shadows
+            x = (2 * ((i + 0.75) / WIDTH) - 1) * aspect_ratio * scale;
+            y = (1 - (2 * ((j + 0.5) / HEIGHT))) * scale;
+            //calculate ray from camera to the pixel and normalize it
+            pixel_pos_local = glm::vec3(x, y, focal);
+            //transform the vectors with the translation vector
+            cam_position_transformed = (ts_vector + cameraPosition) * rotation_matrix;
+            pixel_pos_world = (ts_vector + pixel_pos_local) * rotation_matrix;
+            //generate and normalize ray direction
+            ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
+            // get the colour from nearest triangle the ray intersects, if none then we draw black
+            Colour line_colour3 = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
+            // tracing shadows
 
-            // x = (2 * ((i + 0.5) / WIDTH) - 1) * aspect_ratio * scale;
-            // y = (1 - (2 * ((j + 0.25) / HEIGHT))) * scale;
-            // //calculate ray from camera to the pixel and normalize it
-            // pixel_pos_local = glm::vec3(x, y, focal);
-            // //transform the vectors with the translation vector
-            // cam_position_transformed = (ts_vector + cameraPosition) * rotation_matrix;
-            // pixel_pos_world = (ts_vector + pixel_pos_local) * rotation_matrix;
-            // //generate and normalize ray direction
-            // ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
-            // // get the colour from nearest triangle the ray intersects, if none then we draw black
-            // Colour line_colour4 = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
+            x = (2 * ((i + 0.5) / WIDTH) - 1) * aspect_ratio * scale;
+            y = (1 - (2 * ((j + 0.25) / HEIGHT))) * scale;
+            //calculate ray from camera to the pixel and normalize it
+            pixel_pos_local = glm::vec3(x, y, focal);
+            //transform the vectors with the translation vector
+            cam_position_transformed = (ts_vector + cameraPosition) * rotation_matrix;
+            pixel_pos_world = (ts_vector + pixel_pos_local) * rotation_matrix;
+            //generate and normalize ray direction
+            ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
+            // get the colour from nearest triangle the ray intersects, if none then we draw black
+            Colour line_colour4 = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
             // tracing shadows
 
             // output to screen
-            // float red = (line_colour.red + line_colour2.red + line_colour3.red + line_colour4.red) / 4;
-            // float green = (line_colour.green + line_colour2.green + line_colour3.green + line_colour4.green) / 4;
-            // float blue = (line_colour.green + line_colour2.blue + line_colour3.blue + line_colour4.blue) / 4;
+            float red = (line_colour.red + line_colour2.red + line_colour3.red + line_colour4.red) / 4;
+            float green = (line_colour.green + line_colour2.green + line_colour3.green + line_colour4.green) / 4;
+            float blue = (line_colour.green + line_colour2.blue + line_colour3.blue + line_colour4.blue) / 4;
             uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
             window.setPixelColour(i, j, colour);
         }
