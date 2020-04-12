@@ -324,25 +324,34 @@ bool shadow_detector(glm::vec3 light_source, std::vector<ModelTriangle> triangle
 
     return is_intersection;
 }
-Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, glm::vec3 light_source, bool is_shadow)
+Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow)
 {
-
     glm::vec3 A = triangle.vertices[1] - triangle.vertices[0];
     glm::vec3 B = triangle.vertices[2] - triangle.vertices[0];
     glm::vec3 cross = glm::cross(B, A);
     glm::vec3 triangle_normal = glm::normalize(cross);
-    // glm::vec3 average_vertices = (triangle.vertices[0] + triangle.vertices[1] + triangle.vertices[2]);
-    // average_vertices = glm::vec3(float(average_vertices.x / 3), float(average_vertices.y / 3), float(average_vertices.z / 3));
-    glm::vec3 surface_to_lightsource = intersection_point - light_source;
-    float dot_product = glm::dot(triangle_normal, surface_to_lightsource);
-    if ((dot_product > 0) && (dot_product < 90))
+    glm::vec3 average_vertices = (triangle.vertices[0] + triangle.vertices[1] + triangle.vertices[2]);
+    average_vertices = glm::vec3(float(average_vertices.x / 3), float(average_vertices.y / 3), float(average_vertices.z / 3));
+    glm::vec3 surface_to_lightsource;
+    float dot_product = 0.0;
+    float coefficient = 0.0;
+    bool inside_color = false;
+    for (int i = 0; i < light_source.size(); i++)
     {
-        // distance r
-        float r = distance_of_vectors(intersection_point, light_source);
-        float power = pow(r, 2);
-        // includes angle of incidence
-        float coefficient = (100.0 * dot_product) / (4 * M_PI * power);
+        surface_to_lightsource = intersection_point - light_source[i];
+        dot_product = glm::dot(triangle_normal, surface_to_lightsource);
+        if ((dot_product > 0) && (dot_product < 90))
+        {
+            inside_color = true;
+            float r = distance_of_vectors(intersection_point, light_source[i]);
+            float power = pow(r, 2);
 
+            coefficient = coefficient + ((40.0 * dot_product) / (4 * M_PI * power));
+        }
+    }
+
+    if (inside_color == true)
+    {
         //does not include angle of incidence
         // float coefficient = 10.0 / (power);
         if (coefficient > 1)
@@ -354,9 +363,12 @@ Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, 
             //ambieng lighting - Turned off for now
             coefficient = 0;
         }
-        if (is_shadow == true)
+        for (int i = 0; i < is_shadow.size(); i++)
         {
-            coefficient = 0.2;
+            if (is_shadow[i] == true)
+            {
+                coefficient = coefficient * 0.5;
+            }
         }
         float red = float(triangle.colour.red) * coefficient;
         float green = float(triangle.colour.green) * coefficient;
@@ -388,7 +400,36 @@ Colour specular_lighting(ModelTriangle triangle, glm::vec3 intersection_point, g
 
     return Colour(int(r), int(g), int(b));
 }
+std::vector<glm::vec3> get_light_points(glm::vec3 middle_light_point)
+{
+    std::vector<glm::vec3> light_points;
+    float height = middle_light_point.y;
+    glm::vec3 left_top = glm::vec3(middle_light_point.x - 0.1, height, middle_light_point.z - 0.1);
+    glm::vec3 right_top = glm::vec3(middle_light_point.x + 0.1, height, middle_light_point.z - 0.1);
+    glm::vec3 left_bottom = glm::vec3(middle_light_point.x - 0.1, height, middle_light_point.z + 0.1);
+    glm::vec3 right_bottom = glm::vec3(middle_light_point.x + 0.1, height, middle_light_point.z + 0.1);
+    // glm::vec3 mid_top = glm::vec3(middle_light_point.x - 0.05, height, middle_light_point.z - 0.05);
+    // glm::vec3 mid_bottom = glm::vec3(middle_light_point.x + 0.05, height, middle_light_point.z + 0.05);
 
+    light_points.push_back(left_top);
+    light_points.push_back(right_top);
+    light_points.push_back(left_bottom);
+    light_points.push_back(right_bottom);
+    // light_points.push_back(mid_top);
+    // light_points.push_back(mid_bottom);
+    return light_points;
+}
+std::vector<bool> get_all_shadows(std::vector<glm::vec3> light_sources, std::vector<ModelTriangle> triangles, glm::vec3 closest_point, ModelTriangle closest_triangle)
+{
+    std::vector<bool> shadows;
+    for (int i = 0; i < light_sources.size(); i++)
+    {
+        bool shadow_detection = shadow_detector(light_sources[i], triangles, closest_point, closest_triangle);
+        shadows.push_back(shadow_detection);
+    }
+
+    return shadows;
+}
 Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction)
 {
 
@@ -438,14 +479,25 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
     if (is_intersection)
     {
         glm::vec3 light_source = glm::vec3(-0.234, 4.5, -2.04);
-        bool shadow_detection = shadow_detector(light_source, triangles, closest_point, closest_triangle);
+        std::vector<glm::vec3> light_sources = get_light_points(light_source);
+
+        // bool shadow_detection = shadow_detector(light_sources[0], triangles, closest_point, closest_triangle);
+        // bool shadow_detection2 = shadow_detector(light_sources[1], triangles, closest_point, closest_triangle);
+        // bool shadow_detection3 = shadow_detector(light_sources[2], triangles, closest_point, closest_triangle);
+        // bool shadow_detection4 = shadow_detector(light_sources[3], triangles, closest_point, closest_triangle);
+        std::vector<bool> shadows = get_all_shadows(light_sources, triangles, closest_point, closest_triangle);
+        // shadows.push_back(shadow_detection);
+        // shadows.push_back(shadow_detection2);
+        // shadows.push_back(shadow_detection3);
+        // shadows.push_back(shadow_detection4);
+
         // if (shadow_detection)
-        // {
+        // {b
         //     return black;
         // }
         // else
         // {
-        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_source, shadow_detection);
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, shadows);
         // Colour output_colour = specular_lighting(closest_triangle, closest_point, cameraPosition, light_source, shadow_detection);
         return output_colour;
         // }
