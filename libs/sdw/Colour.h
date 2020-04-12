@@ -4,12 +4,19 @@ class Colour
 {
 public:
   std::string name;
+  std::string type;
   int red;
   int green;
   int blue;
 
   Colour()
   {
+  }
+
+  Colour(std::string n, std::string t) //for ppm type texture
+  {
+    name = n;
+    type = t;
   }
 
   Colour(int r, int g, int b)
@@ -27,6 +34,16 @@ public:
     green = g;
     blue = b;
   }
+
+  Colour(std::string n, int r, int g, int b, std::string t)
+  {
+    name = n;
+    red = r;
+    green = g;
+    blue = b;
+    type = t;
+  }
+
   int getred()
   {
     return red;
