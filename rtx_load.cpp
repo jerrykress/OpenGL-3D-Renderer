@@ -6,6 +6,7 @@
 #include <fstream>
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <string>
 #include <sstream>
@@ -34,6 +35,35 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 std::vector<ModelTriangle> global_triangles;
+
+void savePPM(DrawingWindow w, std::string filename)
+{
+    //open a new file
+    std::ofstream file;
+    file.open(filename);
+
+    //write ppm header
+    file << "P3\n";
+    file << WIDTH << " " << HEIGHT << "\n";
+    file << "255\n";
+
+    //write ppm body
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            //get each pixel and deconstruct
+            uint32_t pixel = w.getPixelColour(j, i);
+
+            int b =  pixel & 255;
+            int g = (pixel >> 8) & 25;
+            int r = (pixel >> 16) & 25;
+
+            file << r << " " << g << " " << b << "  ";
+        }
+        file << "\n";
+    }
+
+    file.close();
+}
 
 std::map<std::string, Colour> load_mtl(std::string filename)
 {
@@ -702,6 +732,7 @@ int main(int argc, char *argv[])
         display_obj(global_triangles, cameraPosition);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
         window.renderFrame();
+
     }
 
     return 0;
