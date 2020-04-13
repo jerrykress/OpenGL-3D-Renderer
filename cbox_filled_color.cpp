@@ -460,7 +460,8 @@ std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float dept
 
         projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1)), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1))),
                                            CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1)), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1))),
-                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1)))));
+                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1))),
+                                           face.colour));
     }
 
     return projected;
@@ -528,8 +529,8 @@ void display_obj(std::vector<std::string> filenames, float canvasDepth)
 
     for (int i = 0; i < triangles.size(); i++)
     {
-        stroke_triangle(triangles[i]);
-        // filled_triangle(triangles[i], mtls[face_mtl[i]]);
+        // stroke_triangle(triangles[i]);
+        filled_triangle(triangles[i], triangles[i].colour);
     }
 }
 
