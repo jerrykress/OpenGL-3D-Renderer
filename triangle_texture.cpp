@@ -346,8 +346,6 @@ void texture_colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3,
                 v4_texture_x = v4_line_values[i][0];
             }
         }
-        std::cout << "Texture X :" << v4_texture_x << "\n";
-        std::cout << "Texture Y :" << v4_texture_y << "\n";
         TexturePoint t_v4 = TexturePoint(v4_texture_x, v4_texture_y);
         v4.texturePoint = t_v4;
         texture_fillBottomFlatTriangle(vt1, vt2, v4, rgb_values);
