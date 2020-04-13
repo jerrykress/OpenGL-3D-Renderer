@@ -17,7 +17,6 @@
 #define SCALING 60
 
 std::vector<std::string> split(std::string str, char delimiter);
-std::vector<ModelTriangle> load_obj(std::string filename);
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float depth);
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
 glm::vec3 *interpolate(glm::vec3 a, glm::vec3 b, int gap);
@@ -25,11 +24,9 @@ int indexofSmallestElement(float array[], int size);
 int indexofLargestElement(float array[], int size);
 void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color);
 void filled_triangle(CanvasTriangle triangle, Colour tri_color);
-void display_obj(std::string filename, float canvasDepth);
+void display_obj(std::vector<std::string> filenames, float canvasDepth);
 void setPixelColour_(int x, int y, Colour colour);
 void clearDepthBuffer(std::string bufferName);
-std::map<int, std::string> load_colour(std::string filename);
-std::map<std::string, Colour> load_mtl(std::string filename);
 std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
@@ -41,58 +38,244 @@ Colour white = Colour(255, 255, 255);
 float **currentDepth = new float *[WIDTH];
 float **incomingDepth = new float *[WIDTH];
 
-std::map<std::string, Colour>
-load_mtl(std::string filename)
+std::map<std::string, Colour> load_mtl(std::string filename)
 {
-    //metadata
+
+    std::map<std::string, Colour> mtl; //result
+    std::vector<std::string> lines;
+
     std::ifstream file(filename.c_str());
-    //mtl lookup table
-    std::map<std::string, Colour> mtl;
-    //parsing info
-    std::vector<std::string> mtlName;
-    //flag for checking parsing
-    bool parsingMtl = false;
 
     if (file.is_open())
-    {
+    { //convert file to vector of strings
         std::string line;
         while (std::getline(file, line))
         {
-            if (parsingMtl)
-            {
-                if (line.length() < 1)
-                {
-                    throw "Empty material found!";
-                }
+            lines.push_back(line);
+        }
+    }
 
-                std::vector<std::string> mtlVal = split(line, ' ');
+    for (int i = 0; i < lines.size(); i++)
+    { //for each line in file
+        if (lines[i].length() < 1)
+        {
+            continue; //if empty, skip
+        }
+        std::vector<std::string> splits = split(lines[i], ' '); //otherwise process current line
+        std::string mode = splits[0];                           //extract line header
 
-                if (mtlVal.size() != 4 || mtlVal[0] != "Kd")
-                {
-                    throw "Material definition is not in correct format!";
-                }
+        if (mode == "newmtl")
+        {
+            std::string mtl_name = splits[1];
+            std::string mtl_detail = lines[i + 1];
+            std::vector<std::string> details = split(mtl_detail, ' ');
+            Colour mtl_val = Colour(mtl_name, (int)(std::stof(details[1]) * 255), (int)(std::stof(details[2]) * 255), (int)(std::stof(details[3]) * 255), details[0]);
 
-                Colour mtlColour = Colour(mtlName[1], (int)(std::stof(mtlVal[1]) * 255), (int)(std::stof(mtlVal[2]) * 255), (int)(std::stof(mtlVal[3]) * 255));
+            mtl.insert(std::pair<std::string, Colour>(mtl_name, mtl_val));
+            i++; //skip next line
+        }
 
-                mtl.insert(std::pair<std::string, Colour>(mtlName[1], mtlColour));
-
-                parsingMtl = false;
-            }
-
-            if (line.length() < 1)
-                continue;
-
-            mtlName = split(line, ' ');
-
-            if (mtlName[0] == "newmtl")
-            {
-                parsingMtl = true;
-                continue;
-            }
+        if (mode == "map_Kd")
+        {
+            std::string mtl_name = splits[1];
+            Colour mtl_val = Colour(mtl_name, "map_Kd");
         }
     }
 
     return mtl;
+}
+
+std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
+{
+    std::vector<ModelTriangle> loaded_triangles; //result
+
+    for (std::string filename : filenames)
+    {
+
+        std::vector<std::string> lines;
+        std::vector<glm::vec3> vs;
+        std::vector<glm::vec2> vts;
+        std::vector<glm::vec3> vns;
+        std::vector<std::string> fs;
+        std::map<std::string, Colour> cls;
+
+        std::string current_object = "NULL";
+        std::string current_colour = "NULL";
+
+        std::ifstream file(filename.c_str());
+
+        if (file.is_open())
+        { //convert file to vector of strings
+            std::string line;
+            while (std::getline(file, line))
+            {
+                lines.push_back(line);
+            }
+        }
+
+        std::cout << "Done loading file..." << std::endl;
+
+        for (int i = 0; i < lines.size(); i++)
+        { //for each line in file
+            if (lines[i].length() < 1)
+            {
+                current_colour = "NULL"; //reset current face colour
+                current_object = "NULL"; //reset current object type
+                continue;                //if empty, skip
+            }
+            std::vector<std::string> splits = split(lines[i], ' '); //otherwise process current line
+            std::string mode = splits[0];                           //extract line header
+
+            if (mode == "mtllib")
+            {
+                std::string mtlName = splits[1];
+                cls = load_mtl(mtlName);
+                std::cout << "Sucessfully loaded materials..." << std::endl;
+                continue;
+            }
+
+            if (mode == "usemtl")
+            {
+                current_colour = splits[1];
+                continue;
+            }
+
+            if (mode == "o")
+            {
+                current_object = splits[1];
+                continue;
+            }
+
+            if (mode == "f")
+            {
+                if (splits.size() != 4)
+                    throw "Incorrect face information in object file!";
+
+                if (current_colour != "NULL")
+                {
+                    fs.push_back(lines[i] + " " + current_colour + "," + current_object);
+                }
+                else
+                {
+                    fs.push_back(lines[i]);
+                }
+                continue;
+            }
+
+            if (mode == "v")
+            {
+                vs.push_back(glm::vec3(std::stof(splits[1]), std::stof(splits[2]), std::stof(splits[3])));
+                continue;
+            }
+
+            if (mode == "vt")
+            {
+                vts.push_back(glm::vec2(std::stof(splits[1]), std::stof(splits[2])));
+                continue;
+            }
+
+            if (mode == "vn")
+            {
+                vns.push_back(glm::vec3(std::stof(splits[1]), std::stof(splits[2]), std::stof(splits[3])));
+                continue;
+            }
+        }
+
+        std::cout << "Done Parsing file..." << std::endl;
+
+        for (std::string f : fs)
+        {
+            std::vector<int> f_vs;
+            std::vector<int> f_vts;
+            std::vector<int> f_vns;
+
+            std::vector<std::string> face_info = split(f, ' '); //split each line of face information
+            std::cout << "Started processing face: " << f << std::endl;
+
+            for (int i = 1; i < 4; i++)
+            { //process 3 vertex groups
+                std::vector<std::string> vertex_info = split(face_info[i], '/');
+
+                if (vertex_info.size() == 1)
+                {
+                    f_vs.push_back(std::stoi(vertex_info[0]));
+                }
+                if (vertex_info.size() == 2)
+                {
+                    f_vs.push_back(std::stoi(vertex_info[0]));
+                    f_vts.push_back(std::stoi(vertex_info[1]));
+                }
+                if (vertex_info.size() == 3)
+                {
+                    f_vs.push_back(std::stoi(vertex_info[0]));
+                    f_vts.push_back(std::stoi(vertex_info[1]));
+                    f_vns.push_back(std::stoi(vertex_info[2]));
+                }
+            }
+
+            std::cout << "Processed face vertices..." << std::endl;
+            std::cout << "Retriving vertex:" << f_vs[0] << "," << f_vs[1] << "," << f_vs[2] << " of total " << vs.size() << std::endl;
+
+            glm::vec3 v0 = vs[f_vs[0] - 1];
+            glm::vec3 v1 = vs[f_vs[1] - 1];
+            glm::vec3 v2 = vs[f_vs[2] - 1];
+
+            std::cout << "Got face vertices..." << std::endl;
+
+            ModelTriangle new_triangle = ModelTriangle(v0, v1, v2);
+
+            std::cout << "Built face with vertices..." << std::endl;
+
+            if (!f_vts.empty())
+            {
+                glm::vec2 t0 = vts[f_vts[0] - 1];
+                glm::vec2 t1 = vts[f_vts[1] - 1];
+                glm::vec2 t2 = vts[f_vts[2] - 1];
+
+                new_triangle.setTexture(t0, t1, t2);
+
+                std::cout << "Set face texture..." << std::endl;
+            }
+
+            if (!f_vns.empty())
+            {
+                glm::vec3 n0 = vns[f_vns[0] - 1];
+                glm::vec3 n1 = vns[f_vns[1] - 1];
+                glm::vec3 n2 = vns[f_vns[2] - 1];
+
+                new_triangle.setNormal(n0, n1, n2);
+
+                std::cout << "Set face normal..." << std::endl;
+            }
+
+            if (face_info.size() == 5)
+            {
+                //if face has additional information appended (colour and object type)
+                std::vector<std::string> extras = split(face_info[4], ',');
+
+                if (extras.size() == 2)
+                {
+                    if (cls.find(extras[0]) != cls.end())
+                    {
+                        Colour tri_colour = cls[extras[0]];
+                        new_triangle.setColour(tri_colour);
+                    }
+                    std::cout << "Set face colour..." << std::endl;
+
+                    new_triangle.setType(extras[1]);
+                }
+            }
+
+            loaded_triangles.push_back(new_triangle);
+
+            std::cout << "Added new face...\n"
+                      << std::endl;
+        }
+
+        std::cout << "Successfully loaded: " << filename << std::endl;
+    }
+
+    return loaded_triangles;
 }
 
 void setPixelColour_(int x, int y, Colour colour)
@@ -335,88 +518,6 @@ std::vector<std::string> split(std::string str, char delimiter)
     return internal;
 }
 
-// MLT = value from 0 to 1 so RGB = 255 * MLT value
-std::vector<ModelTriangle> load_obj(std::string filename)
-{
-    //lines from obj file
-    std::vector<glm::vec3> vs;
-    std::vector<glm::vec3> fs;
-    //constructed elements
-    std::vector<ModelTriangle> faces;
-    //metadata
-    std::ifstream file(filename.c_str());
-
-    //read in entire file line by line
-    if (file.is_open())
-    {
-        std::string line;
-        while (std::getline(file, line))
-        {
-            if (line.length() < 1)
-                continue;
-            line.erase(std::remove(line.begin(), line.end(), '/'), line.end());
-
-            std::vector<std::string> chunks = split(line, ' ');
-            //find if it's a vertex or a face
-            if (chunks[0] == "v")
-            {
-
-                vs.push_back(glm::vec3(std::stof(chunks[1]), std::stof(chunks[2]), std::stof(chunks[3])));
-            }
-
-            if (chunks[0] == "f")
-            {
-                fs.push_back(glm::vec3(std::stoi(chunks[1]), std::stoi(chunks[2]), std::stoi(chunks[3])));
-            }
-        }
-    }
-    //build faces from vertices
-    for (glm::vec3 f : fs)
-    {
-
-        faces.push_back(ModelTriangle(vs[f.x - 1], vs[f.y - 1], vs[f.z - 1], white));
-    }
-
-    return faces;
-}
-
-std::map<int, std::string> load_colour(std::string filename)
-{
-    std::map<int, std::string> face_mtl;
-
-    //metadata
-    std::ifstream file(filename.c_str());
-    std::string currentColour;
-    int faceIndex = 0;
-
-    //read in entire file line by line
-    if (file.is_open())
-    {
-        std::string line;
-        while (std::getline(file, line))
-        {
-            if (line.length() < 1)
-                continue;
-            line.erase(std::remove(line.begin(), line.end(), '/'), line.end());
-
-            std::vector<std::string> chunks = split(line, ' ');
-
-            if (chunks[0] == "usemtl")
-            {
-                currentColour = chunks[1];
-                continue;
-            }
-
-            if (chunks[0] == "f")
-            {
-                face_mtl.insert(std::pair<int, std::string>(faceIndex, currentColour));
-                faceIndex++;
-            }
-        }
-    }
-
-    return face_mtl;
-}
 
 glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
 {
@@ -455,7 +556,8 @@ std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, float dept
 
         projected.push_back(CanvasTriangle(CanvasPoint(face.vertices[0].x * focal / ((face.vertices[0].z * -1)), (face.vertices[0].y * -1) * focal / ((face.vertices[0].z * -1)), face.vertices[0].z * -1),
                                            CanvasPoint(face.vertices[1].x * focal / ((face.vertices[1].z * -1)), (face.vertices[1].y * -1) * focal / ((face.vertices[1].z * -1)), face.vertices[1].z * -1),
-                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1)), face.vertices[2].z * -1)));
+                                           CanvasPoint(face.vertices[2].x * focal / ((face.vertices[2].z * -1)), (face.vertices[2].y * -1) * focal / ((face.vertices[2].z * -1)), face.vertices[2].z * -1),
+                                           face.colour));
     }
 
     return projected;
@@ -517,19 +619,17 @@ void handleEvent(SDL_Event event)
         std::cout << "MOUSE CLICKED" << std::endl;
 }
 
-void display_obj(std::string filename, float canvasDepth)
+void display_obj(std::vector<std::string> filenames, float canvasDepth)
 {
-    std::vector<CanvasTriangle> triangles = project(load_obj(filename), canvasDepth);
-    std::map<int, std::string> face_mtl = load_colour("cornell.obj");
-    std::map<std::string, Colour> mtls = load_mtl("cornell-box.mtl");
+    std::vector<ModelTriangle> loaded = load_files(filenames);
+    std::vector<CanvasTriangle> triangles = project(loaded, canvasDepth);
 
     for (int i = 0; i < triangles.size(); i++)
     {
         // stroke_triangle(triangles[i]);
-        filled_triangle(triangles[i], mtls[face_mtl[i]]);
+        filled_triangle(triangles[i], triangles[i].colour);
         clearDepthBuffer("incoming");
     }
-    //done painting current object, clear incoming depth array
 }
 
 void clearDepthBuffer(std::string bufferName)
@@ -578,7 +678,9 @@ int main(int argc, char *argv[])
         {
             handleEvent(event);
         }
-        display_obj("cornell.obj", 10);
+
+        std::vector<std::string> files{"cornell-box.obj"};
+        display_obj(files, 10);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
         window.renderFrame();
     }
