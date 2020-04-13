@@ -1,5 +1,5 @@
-# PROJECT_NAME = rtx_load
-PROJECT_NAME = depth_buffer
+PROJECT_NAME = rtx_load
+# PROJECT_NAME = depth_buffer
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp

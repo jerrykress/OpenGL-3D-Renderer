@@ -55,8 +55,8 @@ void savePPM(DrawingWindow w, std::string filename)
             uint32_t pixel = w.getPixelColour(j, i);
 
             int b =  pixel & 255;
-            int g = (pixel >> 8) & 25;
-            int r = (pixel >> 16) & 25;
+            int g = (pixel >> 8) & 255;
+            int r = (pixel >> 16) & 255;
 
             file << r << " " << g << " " << b << "  ";
         }
@@ -785,7 +785,7 @@ int main(int argc, char *argv[])
     std::vector<std::string> files{"cornell-box.obj", "sphere8.obj"};
     global_triangles = load_files(files);
 
-    while (true)
+    if (true)
     {
         // We MUST poll for events - otherwise the window will freeze !
         if (window.pollForInputEvents(&event))
@@ -796,6 +796,8 @@ int main(int argc, char *argv[])
         //this is the function that does ray tracing
         display_obj(global_triangles, cameraPosition);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
+        savePPM(window, "screenshot.ppm");
+
         window.renderFrame();
 
     }
