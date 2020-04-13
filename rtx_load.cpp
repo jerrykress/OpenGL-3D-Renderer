@@ -28,6 +28,7 @@ void filled_triangle(CanvasTriangle triangle, Colour tri_color);
 void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
+Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass);
 std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
 // Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction);
 Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction);
@@ -181,7 +182,8 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
                 continue;
             }
 
-            if (mode == "o"){
+            if (mode == "o")
+            {
                 current_object = splits[1];
                 continue;
             }
@@ -289,11 +291,11 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
             }
 
             if (face_info.size() == 5)
-            { 
+            {
                 //if face has additional information appended (colour and object type)
                 std::vector<std::string> extras = split(face_info[4], ',');
 
-                if(extras.size() == 2)
+                if (extras.size() == 2)
                 {
                     if (cls.find(extras[0]) != cls.end())
                     {
@@ -304,7 +306,6 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
 
                     new_triangle.setType(extras[1]);
                 }
-
             }
 
             loaded_triangles.push_back(new_triangle);
@@ -403,6 +404,63 @@ float distance_of_vectors(glm::vec3 start, glm::vec3 end)
 {
     return sqrt(pow(end.x - start.x, 2.0) + pow(end.y - start.y, 2.0) + pow(end.z - start.z, 2.0));
 }
+
+Colour mirror(ModelTriangle triangle, glm::vec3 incoming_ray, std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition, std::vector<glm::vec3> light_sources, std::vector<bool> is_shadows)
+{
+    // triangle normal
+    glm::vec3 A = triangle.vertices[1] - triangle.vertices[0];
+    glm::vec3 B = triangle.vertices[2] - triangle.vertices[0];
+    glm::vec3 cross = glm::cross(B, A);
+    glm::vec3 triangle_normal = glm::normalize(cross);
+    // get Reflection ray
+    float N_dot_I = glm::dot(triangle_normal, incoming_ray) * 2.0;
+    glm::vec3 ground_ray = N_dot_I * triangle_normal;
+    glm::vec3 reflection_ray = incoming_ray - ground_ray;
+    glm::vec3 closest_point = glm::vec3(0, 0, 0);
+    ModelTriangle closest_triangle = triangles[0];
+
+    float closest_t = FLT_MAX;
+    bool is_intersection = false;
+    Colour black = Colour(0, 0, 0);
+    //loop through every triangle
+    for (ModelTriangle triangle : triangles)
+    {
+        if (triangle.type != "left_wall")
+        {
+            glm::vec3 e0 = triangle.vertices[1] - triangle.vertices[0];
+            glm::vec3 e1 = triangle.vertices[2] - triangle.vertices[0];
+            glm::vec3 SPVector = cameraPosition - triangle.vertices[0];
+            glm::mat3 DEMatrix(-reflection_ray, e0, e1);
+            glm::vec3 possibleSolution = glm::inverse(DEMatrix) * SPVector;
+            float t = possibleSolution[0];
+            float u = possibleSolution[1];
+            float v = possibleSolution[2];
+            // find the one that is closest
+            if (t > 0)
+            {
+                if ((0.0 <= u) && (u <= 1.0) && (0.0 <= v) && (v <= 1.0) && (u + v <= 1))
+                {
+                    if (t < closest_t)
+                    {
+                        is_intersection = true;
+                        closest_t = t;
+                        closest_triangle = triangle;
+                        closest_point = triangle.vertices[0] + (u * e0) + (v * e1);
+                    }
+                }
+            }
+        }
+    }
+    if (is_intersection)
+    {
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, is_shadows, true);
+        return output_colour;
+    }
+    else
+    {
+        return black;
+    }
+}
 bool shadow_detector(glm::vec3 light_source, std::vector<ModelTriangle> triangles, glm::vec3 intersection_point, ModelTriangle current_triangle)
 {
     float closest_t = FLT_MAX;
@@ -453,7 +511,7 @@ bool shadow_detector(glm::vec3 light_source, std::vector<ModelTriangle> triangle
 
     return is_intersection;
 }
-Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow)
+Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass)
 {
     glm::vec3 A = triangle.vertices[1] - triangle.vertices[0];
     glm::vec3 B = triangle.vertices[2] - triangle.vertices[0];
@@ -492,11 +550,14 @@ Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, 
             //ambieng lighting - Turned off for now
             coefficient = 0;
         }
-        for (int i = 0; i < is_shadow.size(); i++)
+        if (is_glass == false)
         {
-            if (is_shadow[i] == true)
+            for (int i = 0; i < is_shadow.size(); i++)
             {
-                coefficient = coefficient * 0.5;
+                if (is_shadow[i] == true)
+                {
+                    coefficient = coefficient * 0.5;
+                }
             }
         }
         float red = float(triangle.colour.red) * coefficient;
@@ -602,7 +663,11 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         glm::vec3 light_source = glm::vec3(1.234, 4.5, 0.04);
         std::vector<glm::vec3> light_sources = get_light_points(light_source);
         std::vector<bool> shadows = get_all_shadows(light_sources, triangles, closest_point, closest_triangle);
-        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, shadows);
+        if (closest_triangle.type == "left_wall")
+        {
+            return mirror(closest_triangle, ray_direction, triangles, closest_point, light_sources, shadows);
+        }
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, shadows, false);
         // Colour output_colour = specular_lighting(closest_triangle, closest_point, cameraPosition, light_source, shadow_detection);
         return output_colour;
         // }
