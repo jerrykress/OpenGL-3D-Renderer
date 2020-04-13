@@ -10,6 +10,7 @@ class ModelTriangle
     glm::vec3 normals[3];
     glm::vec3 normal;
     Colour colour;
+    std::string type;
 
     ModelTriangle()
     {
@@ -46,6 +47,10 @@ class ModelTriangle
 
     void setColour(Colour c){
       colour = c;
+    }
+
+    void setType(std::string t){
+      type = t;
     }
 };
 

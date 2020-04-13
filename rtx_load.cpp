@@ -110,6 +110,7 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
         std::vector<std::string> fs;
         std::map<std::string, Colour> cls;
 
+        std::string current_object = "NULL";
         std::string current_colour = "NULL";
 
         std::ifstream file(filename.c_str());
@@ -130,6 +131,7 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
             if (lines[i].length() < 1)
             {
                 current_colour = "NULL"; //reset current face colour
+                current_object = "NULL"; //reset current object type
                 continue;                //if empty, skip
             }
             std::vector<std::string> splits = split(lines[i], ' '); //otherwise process current line
@@ -149,6 +151,11 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
                 continue;
             }
 
+            if (mode == "o"){
+                current_object = splits[1];
+                continue;
+            }
+
             if (mode == "f")
             {
                 if (splits.size() != 4)
@@ -156,7 +163,7 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
 
                 if (current_colour != "NULL")
                 {
-                    fs.push_back(lines[i] + " " + current_colour);
+                    fs.push_back(lines[i] + " " + current_colour + "," + current_object);
                 }
                 else
                 {
@@ -252,13 +259,22 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
             }
 
             if (face_info.size() == 5)
-            { //if face has a colour appended, try to locate it
-                if (cls.find(face_info[4]) != cls.end())
+            { 
+                //if face has additional information appended (colour and object type)
+                std::vector<std::string> extras = split(face_info[4], ',');
+
+                if(extras.size() == 2)
                 {
-                    Colour tri_colour = cls[face_info[4]];
-                    new_triangle.setColour(tri_colour);
+                    if (cls.find(extras[0]) != cls.end())
+                    {
+                        Colour tri_colour = cls[extras[0]];
+                        new_triangle.setColour(tri_colour);
+                    }
+                    std::cout << "Set face colour..." << std::endl;
+
+                    new_triangle.setType(extras[1]);
                 }
-                std::cout << "Set face colour..." << std::endl;
+
             }
 
             loaded_triangles.push_back(new_triangle);
