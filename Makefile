@@ -1,4 +1,4 @@
-PROJECT_NAME = ray_tracer
+PROJECT_NAME = rtx_load
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp
