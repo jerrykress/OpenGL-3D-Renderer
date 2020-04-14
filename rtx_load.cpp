@@ -163,7 +163,7 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
         { //for each line in file
             if (lines[i].length() < 1)
             {
-                continue;                //if empty, skip
+                continue; //if empty, skip
             }
             std::vector<std::string> splits = split(lines[i], ' '); //otherwise process current line
             std::string mode = splits[0];                           //extract line header
@@ -407,11 +407,7 @@ float distance_of_vectors(glm::vec3 start, glm::vec3 end)
 
 Colour mirror(ModelTriangle triangle, glm::vec3 incoming_ray, std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition, std::vector<glm::vec3> light_sources, std::vector<bool> is_shadows)
 {
-    // triangle normal
-    glm::vec3 A = triangle.vertices[1] - triangle.vertices[0];
-    glm::vec3 B = triangle.vertices[2] - triangle.vertices[0];
-    glm::vec3 cross = glm::cross(B, A);
-    glm::vec3 triangle_normal = glm::normalize(cross);
+    glm::vec3 triangle_normal = triangle.normal;
     // get Reflection ray
     float N_dot_I = glm::dot(triangle_normal, incoming_ray) * 2.0;
     glm::vec3 ground_ray = N_dot_I * triangle_normal;
@@ -513,10 +509,7 @@ bool shadow_detector(glm::vec3 light_source, std::vector<ModelTriangle> triangle
 }
 Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass)
 {
-    glm::vec3 A = triangle.vertices[1] - triangle.vertices[0];
-    glm::vec3 B = triangle.vertices[2] - triangle.vertices[0];
-    glm::vec3 cross = glm::cross(B, A);
-    glm::vec3 triangle_normal = glm::normalize(cross);
+    glm::vec3 triangle_normal = triangle.normal;
     glm::vec3 average_vertices = (triangle.vertices[0] + triangle.vertices[1] + triangle.vertices[2]);
     average_vertices = glm::vec3(float(average_vertices.x / 3), float(average_vertices.y / 3), float(average_vertices.z / 3));
     glm::vec3 surface_to_lightsource;
@@ -574,8 +567,12 @@ Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, 
 
 Colour specular_lighting(ModelTriangle triangle, glm::vec3 intersection_point, glm::vec3 camera_position, glm::vec3 light_source, bool is_shadow)
 {
+    glm::vec3 A = triangle.vertices[1] - triangle.vertices[0];
+    glm::vec3 B = triangle.vertices[2] - triangle.vertices[0];
+    glm::vec3 cross = glm::cross(B, A);
+    glm::vec3 triangle_normal_vector = glm::normalize(cross);
     glm::vec3 entry_ray = glm::normalize(intersection_point - light_source);
-    glm::vec3 triangle_normal = (glm::dot(triangle.normal, entry_ray) <= 0) ? (triangle.normal) : (triangle.normal * -1.0f);
+    glm::vec3 triangle_normal = (glm::dot(triangle_normal_vector, entry_ray) <= 0) ? (triangle_normal_vector) : (triangle_normal_vector * -1.0f);
     glm::vec3 observation_ray = glm::normalize(camera_position - intersection_point);
     glm::vec3 reflection_ray = glm::normalize(entry_ray - float(2) * glm::dot(triangle_normal, entry_ray) * triangle_normal);
 
@@ -668,7 +665,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
             return mirror(closest_triangle, ray_direction, triangles, closest_point, light_sources, shadows);
         }
         Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, shadows, false);
-        // Colour output_colour = specular_lighting(closest_triangle, closest_point, cameraPosition, light_source, shadow_detection);
+        // Colour output_colour = specular_lighting(closest_triangle, closest_point, cameraPosition, light_sources[0], shadows[0]);
         return output_colour;
         // }
     }
@@ -782,24 +779,18 @@ int main(int argc, char *argv[])
     glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
 
     //load multiple files, give list as input
-    std::vector<std::string> files{"cornell-box.obj", "logo.obj"};
+    std::vector<std::string> files{"cornell-box.obj"};
     global_triangles = load_files(files);
 
     for (ModelTriangle triangle : global_triangles)
     {
         if (triangle.type == "logo")
         {
-            std::cout << "resizing logo";
-            for (int i = 0; i < 3; i++)
-            {
-                triangle.vertices[i].x = (triangle.vertices[i].x / 100);
-                triangle.vertices[i].y = (triangle.vertices[i].y / 100);
-                triangle.vertices[i].z = triangle.vertices[i].z / 6;
-            }
+            std::cout << " LOGO ";
         }
     }
 
-    if (true)
+    while (true)
     {
         // We MUST poll for events - otherwise the window will freeze !
         if (window.pollForInputEvents(&event))
@@ -810,7 +801,7 @@ int main(int argc, char *argv[])
         //this is the function that does ray tracing
         display_obj(global_triangles, cameraPosition);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
-        savePPM(window, "screenshot.ppm");
+        // savePPM(window, "screenshot.ppm"); 
 
         window.renderFrame();
     }
