@@ -397,6 +397,35 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
     //input as degress -> converter inside function
     glm::mat3 final_rotation_matrix = camera_rotation(0, 0, cameraPosition);
     // cameraPosition[2] = cameraPosition[2] + 4;
+    // glm::vec3 temp = glm::vec3(1, 1, 1);
+
+    for (int i = 0; i < triangles.size(); i++)
+    {
+        if (triangles[i].type == "logo")
+        {
+
+            for (int j = 0; j < 3; j++)
+            {
+                triangles[i].vertices[j].x = (triangles[i].vertices[j].x / 100) - 3.0;
+                triangles[i].vertices[j].y = (triangles[i].vertices[j].y / 100);
+                triangles[i].vertices[j].z = (triangles[i].vertices[j].z / 11) - 2.5;
+            }
+        }
+    }
+    for (int i = 0; i < triangles.size(); i++)
+    {
+        if (triangles[i].type == "logo")
+        {
+
+            for (int j = 0; j < 3; j++)
+            {
+                if (triangles[i].vertices[j].x < 10)
+                {
+                    std::cout << " " << triangles[i].vertices[j].x << " " << std::endl;
+                }
+            }
+        }
+    }
 
     intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix);
 }
@@ -779,18 +808,10 @@ int main(int argc, char *argv[])
     glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
 
     //load multiple files, give list as input
-    std::vector<std::string> files{"cornell-box.obj"};
+    std::vector<std::string> files{"cornell-box.obj", "logo.obj"};
     global_triangles = load_files(files);
 
-    for (ModelTriangle triangle : global_triangles)
-    {
-        if (triangle.type == "logo")
-        {
-            std::cout << " LOGO ";
-        }
-    }
-
-    while (true)
+    if (true)
     {
         // We MUST poll for events - otherwise the window will freeze !
         if (window.pollForInputEvents(&event))
@@ -801,7 +822,7 @@ int main(int argc, char *argv[])
         //this is the function that does ray tracing
         display_obj(global_triangles, cameraPosition);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
-        // savePPM(window, "screenshot.ppm"); 
+        savePPM(window, "screenshot.ppm");
 
         window.renderFrame();
     }
