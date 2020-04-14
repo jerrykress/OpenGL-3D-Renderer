@@ -38,7 +38,7 @@ public:
   {
     textures[0] = t0;
     textures[1] = t1;
-    textures[1] = t2;
+    textures[2] = t2;
   }
 
   void setNormal(glm::vec3 n0, glm::vec3 n1, glm::vec3 n2)

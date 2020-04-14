@@ -16,26 +16,80 @@
 #define WIDTH 320
 #define HEIGHT 240
 #define SCALING 20
-void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, glm::mat3 rotation_matrix);
+void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, glm::mat3 rotation_matrix, std::vector<std::vector<Colour>> rgb_values);
 std::vector<std::string> split(std::string str, char delimiter);
 
 std::vector<ModelTriangle> load_obj(std::string filename);
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
-int indexofSmallestElement(float array[], int size);
-int indexofLargestElement(float array[], int size);
-void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color);
-void filled_triangle(CanvasTriangle triangle, Colour tri_color);
 void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
 Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass);
-std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size);
 // Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction);
-Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction);
+Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction, std::vector<std::vector<Colour>> rgb_values);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 std::vector<ModelTriangle> global_triangles;
+
+std::vector<std::vector<Colour>> readfile(std::string filename, int width, int height, std::vector<std::vector<Colour>> rgb_values)
+{
+    std::ifstream file(filename.c_str());
+    if (file.is_open())
+    {
+        // negate first four lines
+        std::string line;
+        for (int i = 0; i < 4; i++)
+        {
+            std::getline(file, line);
+        }
+        // exit(EXIT_FAILURE);
+        int counter = 0;
+        Colour pixel = Colour(0, 0, 0);
+        int x = 0;
+        int y = 0;
+        char byte;
+        while (file.get(byte))
+        {
+            if (counter == 0)
+            {
+                pixel.red = (unsigned char)byte;
+                counter++;
+            }
+            else if (counter == 1)
+            {
+                pixel.green = (unsigned char)byte;
+                counter++;
+            }
+            else
+            {
+                pixel.blue = (unsigned char)byte;
+
+                rgb_values[x][y] = pixel;
+                if (x > width - 2)
+                {
+
+                    x = 0;
+                    if (y > height - 1)
+                    {
+                        return rgb_values;
+                    }
+                    else
+                    {
+                        y++;
+                    }
+                }
+                else
+                {
+                    x++;
+                }
+                counter = 0;
+            }
+            // process pair (a,b)
+        }
+    }
+    return rgb_values;
+}
 
 void savePPM(DrawingWindow w, std::string filename)
 {
@@ -397,8 +451,8 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
     //input as degress -> converter inside function
     glm::mat3 final_rotation_matrix = camera_rotation(0, 0, cameraPosition);
     // cameraPosition[2] = cameraPosition[2] + 4;
-    // glm::vec3 temp = glm::vec3(1, 1, 1);
 
+    // scale logo
     for (int i = 0; i < triangles.size(); i++)
     {
         if (triangles[i].type == "logo")
@@ -406,28 +460,39 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
 
             for (int j = 0; j < 3; j++)
             {
-                triangles[i].vertices[j].x = (triangles[i].vertices[j].x / 100) - 3.0;
-                triangles[i].vertices[j].y = (triangles[i].vertices[j].y / 100);
-                triangles[i].vertices[j].z = (triangles[i].vertices[j].z / 11) - 2.5;
+                triangles[i].vertices[j].x = (triangles[i].vertices[j].x / 120) - 2.5;
+                triangles[i].vertices[j].y = (triangles[i].vertices[j].y / 120);
+                triangles[i].vertices[j].z = (triangles[i].vertices[j].z / 11) - 3.0;
             }
         }
     }
-    for (int i = 0; i < triangles.size(); i++)
+    // load texture
+    std::string filename = "logo_texture.ppm";
+    std::ifstream file(filename.c_str());
+    int width = 0;
+    int height = 0;
+    if (file.is_open())
     {
-        if (triangles[i].type == "logo")
+        std::string line;
+        for (int i = 0; i < 3; i++)
         {
-
-            for (int j = 0; j < 3; j++)
+            std::getline(file, line);
+            if (i == 2)
             {
-                if (triangles[i].vertices[j].x < 10)
-                {
-                    std::cout << " " << triangles[i].vertices[j].x << " " << std::endl;
-                }
+                width = std::stoi(line.substr(0, 3));
+                height = std::stoi(line.substr(4, 6));
             }
         }
     }
-
-    intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix);
+    file.close();
+    std::vector<std::vector<Colour>> rgb_values(width);
+    for (int i = 0; i < width; i++)
+    {
+        rgb_values[i].resize(height);
+    }
+    rgb_values = readfile(filename, width, height, rgb_values);
+    std::cout << "END READING RGB VAL" << std::endl;
+    intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix, rgb_values);
 }
 float distance_of_vectors(glm::vec3 start, glm::vec3 end)
 {
@@ -647,13 +712,40 @@ std::vector<glm::vec3> get_light_points(glm::vec3 middle_light_point)
     // light_points.push_back(mid_bottom);
     return light_points;
 }
-Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction)
+Colour get_texture_colour(float u, float v, ModelTriangle triangle, std::vector<std::vector<Colour>> rgb_values)
+{
+    glm::vec2 e0 = triangle.textures[1] - triangle.textures[0];
+    glm::vec2 e1 = triangle.textures[2] - triangle.textures[0];
+    glm::vec2 closest_point = triangle.textures[0] + (u * e0) + (v * e1);
+    int x = int(closest_point.x * 300);
+    int y = int(closest_point.y * 300);
+    if (x < 0)
+    {
+        x = 0;
+    }
+    if (y < 0)
+    {
+        y = 0;
+    }
+    if (x > 299)
+    {
+        x = 299;
+    }
+    if (y > 299)
+    {
+        y = 299;
+    }
+    return rgb_values[x][y];
+}
+Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction, std::vector<std::vector<Colour>> rgb_values)
 {
 
     glm::vec3 closest_point = glm::vec3(0, 0, 0);
     ModelTriangle closest_triangle = triangles[0];
 
     float closest_t = FLT_MAX;
+    float u = 0.0;
+    float v = 0.0;
     bool is_intersection = false;
     Colour black = Colour(0, 0, 0);
     //loop through every triangle
@@ -666,8 +758,8 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         glm::mat3 DEMatrix(-ray_direction, e0, e1);
         glm::vec3 possibleSolution = glm::inverse(DEMatrix) * SPVector;
         float t = possibleSolution[0];
-        float u = possibleSolution[1];
-        float v = possibleSolution[2];
+        u = possibleSolution[1];
+        v = possibleSolution[2];
         // find the one that is closest
         if (t > 0)
         {
@@ -686,6 +778,10 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 
     if (is_intersection)
     {
+        if (closest_triangle.type == "logo")
+        {
+            return get_texture_colour(u, v, closest_triangle, rgb_values);
+        }
         glm::vec3 light_source = glm::vec3(1.234, 4.5, 0.04);
         std::vector<glm::vec3> light_sources = get_light_points(light_source);
         std::vector<bool> shadows = get_all_shadows(light_sources, triangles, closest_point, closest_triangle);
@@ -703,7 +799,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         return black;
     }
 }
-void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, glm::mat3 rotation_matrix)
+void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, int focal, glm::mat3 rotation_matrix, std::vector<std::vector<Colour>> rgb_values)
 {
     // transformation vector by translation only
     glm::vec3 ts_vector = glm::vec3(0, 2, 3.5);
@@ -714,6 +810,7 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
     //loop through each pixel in image plane coordiantes
     for (int i = 0; i < WIDTH; i++)
     {
+        std::cout << "Width : " << i << std::endl;
         for (int j = 0; j < HEIGHT; j++)
         {
             float x = (2 * ((i + 0.5) / WIDTH) - 1) * aspect_ratio * scale;
@@ -726,7 +823,7 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
             //generate and normalize ray direction
             glm::vec3 ray_direction = glm::normalize(pixel_pos_world - cam_position_transformed);
             // get the colour from nearest triangle the ray intersects, if none then we draw black
-            Colour line_colour = getClosestIntersection(cam_position_transformed, triangles, ray_direction);
+            Colour line_colour = getClosestIntersection(cam_position_transformed, triangles, ray_direction, rgb_values);
             // tracing shadows
 
             // output to screen
@@ -822,6 +919,7 @@ int main(int argc, char *argv[])
         //this is the function that does ray tracing
         display_obj(global_triangles, cameraPosition);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
+        std::cout << "Saving ppm" << std::endl;
         savePPM(window, "screenshot.ppm");
 
         window.renderFrame();
