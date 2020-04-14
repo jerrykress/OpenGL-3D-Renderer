@@ -518,7 +518,6 @@ std::vector<std::string> split(std::string str, char delimiter)
     return internal;
 }
 
-
 glm::vec3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
 {
     // rotate by x-axis

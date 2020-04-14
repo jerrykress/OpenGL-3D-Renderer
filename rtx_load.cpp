@@ -49,12 +49,14 @@ void savePPM(DrawingWindow w, std::string filename)
     file << "255\n";
 
     //write ppm body
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+    for (int i = 0; i < HEIGHT; i++)
+    {
+        for (int j = 0; j < WIDTH; j++)
+        {
             //get each pixel and deconstruct
             uint32_t pixel = w.getPixelColour(j, i);
 
-            int b =  pixel & 255;
+            int b = pixel & 255;
             int g = (pixel >> 8) & 255;
             int r = (pixel >> 16) & 255;
 
@@ -453,7 +455,7 @@ Colour mirror(ModelTriangle triangle, glm::vec3 incoming_ray, std::vector<ModelT
     }
     if (is_intersection)
     {
-        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, is_shadows, true);
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, is_shadows, false);
         return output_colour;
     }
     else
@@ -782,8 +784,22 @@ int main(int argc, char *argv[])
     glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
 
     //load multiple files, give list as input
-    std::vector<std::string> files{"cornell-box.obj", "sphere8.obj"};
+    std::vector<std::string> files{"cornell-box.obj", "logo.obj"};
     global_triangles = load_files(files);
+
+    for (ModelTriangle triangle : global_triangles)
+    {
+        if (triangle.type == "logo")
+        {
+            std::cout << "resizing logo";
+            for (int i = 0; i < 3; i++)
+            {
+                triangle.vertices[i].x = (triangle.vertices[i].x / 100);
+                triangle.vertices[i].y = (triangle.vertices[i].y / 100);
+                triangle.vertices[i].z = triangle.vertices[i].z / 6;
+            }
+        }
+    }
 
     if (true)
     {
@@ -799,7 +815,6 @@ int main(int argc, char *argv[])
         savePPM(window, "screenshot.ppm");
 
         window.renderFrame();
-
     }
 
     return 0;
