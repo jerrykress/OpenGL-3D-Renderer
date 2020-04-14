@@ -163,8 +163,6 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
         { //for each line in file
             if (lines[i].length() < 1)
             {
-                current_colour = "NULL"; //reset current face colour
-                current_object = "NULL"; //reset current object type
                 continue;                //if empty, skip
             }
             std::vector<std::string> splits = split(lines[i], ' '); //otherwise process current line
