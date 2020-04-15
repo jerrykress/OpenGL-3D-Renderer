@@ -61,11 +61,9 @@ public:
   {
     normal = n;
   }
-  void setVertex_Normals(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2)
+  void setVertex_Normals(int index, glm::vec3 v1)
   {
-    vertex_normals[0] = v0;
-    vertex_normals[1] = v1;
-    vertex_normals[2] = v2;
+    vertex_normals[index] = v1;
   }
 };
 
