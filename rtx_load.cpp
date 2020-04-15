@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <list>
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -31,6 +32,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 std::vector<ModelTriangle> global_triangles;
+std::map<std::string, std::pair<glm::vec3, float>> global_animation;
 
 std::vector<std::vector<Colour>> readfile(std::string filename, int width, int height, std::vector<std::vector<Colour>> rgb_values)
 {
@@ -239,6 +241,18 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
             if (mode == "o")
             {
                 current_object = splits[1];
+
+                std::string next_line = lines[i+1];
+                std::vector<std::string> next_split = split(next_line, ' ');
+                std::string next_mode = next_split[0];
+
+                if (next_mode == "a") //if animation info is defined in the next line, parse that information
+                {
+                    glm::vec3 move_direction = glm::vec3(std::stof(next_split[1]), std::stof(next_split[2]), std::stof(next_split[3]));
+                    float move_duration = std::stof(next_split[4]);
+                    global_animation.insert(std::pair<std::string, std::pair<glm::vec3, float>>(current_object, std::pair<glm::vec3, float>(move_direction, move_duration)));
+                }
+
                 continue;
             }
 
@@ -494,6 +508,84 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
     std::cout << "END READING RGB VAL" << std::endl;
     intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix, rgb_values);
 }
+
+void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_position)
+{
+    if (global_animation.empty())
+    {
+        display_obj(initial_triangles, camera_position);
+        return;
+    }
+
+    std::vector<std::vector<ModelTriangle>> animated_stack;
+    int max_frame = 0;
+
+    for (auto item : global_animation) //detect max frame
+    {
+        float current_frame = item.second.second;
+
+        if(current_frame <= 0){
+            throw "Frame number cannot be negative!";
+        }
+
+        if (current_frame > max_frame)
+        {
+            max_frame = int(current_frame);
+        }
+    }
+
+    animated_stack.push_back(initial_triangles);
+
+    for (int f = 1 ; f < max_frame; f++) //animate until max frame number reached
+    {
+        std::vector<ModelTriangle> previous_frame = animated_stack.back(); //get last frame rendered
+        std::vector<ModelTriangle> animated_frame;
+
+        for (ModelTriangle triangle : previous_frame) //apply animation 
+        {
+
+            std::string object_name = triangle.type;
+
+            if (global_animation.find(object_name) != global_animation.end())
+            {
+                std::pair<glm::vec3, float> vertex_animation = global_animation[object_name];
+                glm::vec3 animation_step = vertex_animation.first;
+
+                if (f <= vertex_animation.second)
+                {
+                    glm::vec3 v0 = triangle.vertices[0] + animation_step;
+                    glm::vec3 v1 = triangle.vertices[1] + animation_step;
+                    glm::vec3 v2 = triangle.vertices[2] + animation_step;
+
+                    ModelTriangle animated_triangle;
+                    std::memcpy(&animated_triangle, &triangle, sizeof(ModelTriangle));
+                    animated_triangle.setVertices(v0, v1, v2);
+
+                    animated_frame.push_back(animated_triangle);
+                } else {
+                    animated_frame.push_back(triangle); //if animation over, push last one
+                }
+
+            } else {
+                animated_frame.push_back(triangle);
+            }
+        }
+        animated_stack.push_back(animated_frame);
+    }
+
+    for (int i = 0; i < animated_stack.size(); i++) //export frames
+    {
+        std::cout << "Generating animation frame: " << i << ", size: " << animated_stack[i].size() << std::endl;
+        std::string ppm_filename = "frame_" + std::to_string(i) + ".ppm";
+        
+        display_obj(animated_stack[i], camera_position);
+
+        std::cout << "Saving ppm" << std::endl;
+        savePPM(window, ppm_filename);
+    }
+
+}
+
 float distance_of_vectors(glm::vec3 start, glm::vec3 end)
 {
     return sqrt(pow(end.x - start.x, 2.0) + pow(end.y - start.y, 2.0) + pow(end.z - start.z, 2.0));
@@ -914,7 +1006,7 @@ int main(int argc, char *argv[])
     glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
 
     //load multiple files, give list as input
-    std::vector<std::string> files{"cornell-box.obj", "logo.obj"};
+    std::vector<std::string> files{"cornell-box.obj"};
     global_triangles = load_files(files);
 
     if (true)
@@ -926,10 +1018,8 @@ int main(int argc, char *argv[])
         }
 
         //this is the function that does ray tracing
-        display_obj(global_triangles, cameraPosition);
+        animate(global_triangles, cameraPosition);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
-        std::cout << "Saving ppm" << std::endl;
-        savePPM(window, "screenshot.ppm");
 
         window.renderFrame();
     }

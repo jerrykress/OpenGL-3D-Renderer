@@ -34,6 +34,12 @@ public:
     normal = glm::normalize(glm::cross(v2 - v0, v1 - v0));
   }
 
+  void setVertices(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2){
+    vertices[0] = v0;
+    vertices[1] = v1;
+    vertices[2] = v2;
+  }
+
   void setTexture(glm::vec2 t0, glm::vec2 t1, glm::vec2 t2)
   {
     textures[0] = t0;
