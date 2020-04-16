@@ -32,7 +32,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 std::vector<ModelTriangle> global_triangles;
-std::map<std::string, std::pair<glm::vec3, float>> global_animation;
+std::map<std::string, std::string> global_animation; //object name -> animation info
 
 std::vector<std::vector<Colour>> readfile(std::string filename, int width, int height, std::vector<std::vector<Colour>> rgb_values)
 {
@@ -247,10 +247,9 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
                 std::string next_mode = next_split[0];
 
                 if (next_mode == "a") //if animation info is defined in the next line, parse that information
-                {
-                    glm::vec3 move_direction = glm::vec3(std::stof(next_split[1]), std::stof(next_split[2]), std::stof(next_split[3]));
-                    float move_duration = std::stof(next_split[4]);
-                    global_animation.insert(std::pair<std::string, std::pair<glm::vec3, float>>(current_object, std::pair<glm::vec3, float>(move_direction, move_duration)));
+                {   
+                    std::string animation_info = next_split[1];
+                    global_animation.insert(std::pair<std::string, std::string>(current_object, animation_info));
                 }
 
                 continue;
@@ -511,7 +510,7 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
 
 void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_position)
 {
-    if (global_animation.empty())
+    if (global_animation.empty()) //if no animation is found in any object, just render one frame
     {
         display_obj(initial_triangles, camera_position);
         return;
@@ -522,7 +521,8 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
 
     for (auto item : global_animation) //detect max frame
     {
-        float current_frame = item.second.second;
+        std::vector<std::string> animation_info = split(item.second, ',');
+        float current_frame = std::stof(animation_info[3]);
 
         if (current_frame <= 0)
         {
@@ -549,10 +549,13 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
 
             if (global_animation.find(object_name) != global_animation.end())
             {
-                std::pair<glm::vec3, float> vertex_animation = global_animation[object_name];
-                glm::vec3 animation_step = vertex_animation.first;
+                std::string vertex_animation = global_animation[object_name];
+                std::vector<std::string> animation_info = split(vertex_animation, ',');
+                glm::vec3 animation_step(std::stof(animation_info[0]),
+                                         std::stof(animation_info[1]),
+                                         std::stof(animation_info[2]));
 
-                if (f <= vertex_animation.second)
+                if (f <= std::stof(animation_info[3]))
                 {
                     glm::vec3 v0 = triangle.vertices[0] + animation_step;
                     glm::vec3 v1 = triangle.vertices[1] + animation_step;
@@ -577,7 +580,7 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
         animated_stack.push_back(animated_frame);
     }
 
-    for (int i = 0; i < animated_stack.size(); i++) //export frames
+    for (int i = 1; i < animated_stack.size(); i++) //export frames
     {
         std::cout << "Generating animation frame: " << i << ", size: " << animated_stack[i].size() << std::endl;
         std::string ppm_filename = "frame_" + std::to_string(i) + ".ppm";
@@ -915,7 +918,7 @@ void intersection_on_pixel(glm::vec3 cameraPosition, std::vector<ModelTriangle> 
     //loop through each pixel in image plane coordiantes
     for (int i = 0; i < WIDTH; i++)
     {
-        std::cout << "Width : " << i << std::endl;
+        std::cout << "Sampling: " << i << "/" << WIDTH << std::endl;
         for (int j = 0; j < HEIGHT; j++)
         {
             float x = (2 * ((i + 0.5) / WIDTH) - 1) * aspect_ratio * scale;
