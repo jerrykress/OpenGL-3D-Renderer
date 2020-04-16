@@ -551,21 +551,58 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
             {
                 std::string vertex_animation = global_animation[object_name];
                 std::vector<std::string> animation_info = split(vertex_animation, ',');
+                std::string animation_type = animation_info[4]; //scalar or rotation
                 glm::vec3 animation_step(std::stof(animation_info[0]),
                                          std::stof(animation_info[1]),
                                          std::stof(animation_info[2]));
 
                 if (f <= std::stof(animation_info[3]))
                 {
-                    glm::vec3 v0 = triangle.vertices[0] + animation_step;
-                    glm::vec3 v1 = triangle.vertices[1] + animation_step;
-                    glm::vec3 v2 = triangle.vertices[2] + animation_step;
+                    if (animation_type == "s") //if this is a scalar animation
+                    {
+                        glm::vec3 v0 = triangle.vertices[0] + animation_step;
+                        glm::vec3 v1 = triangle.vertices[1] + animation_step;
+                        glm::vec3 v2 = triangle.vertices[2] + animation_step;
 
-                    ModelTriangle animated_triangle;
-                    std::memcpy(&animated_triangle, &triangle, sizeof(ModelTriangle));
-                    animated_triangle.setVertices(v0, v1, v2);
+                        ModelTriangle animated_triangle;
+                        std::memcpy(&animated_triangle, &triangle, sizeof(ModelTriangle));
+                        animated_triangle.setVertices(v0, v1, v2);
 
-                    animated_frame.push_back(animated_triangle);
+                        animated_frame.push_back(animated_triangle);
+                    }
+
+                    if (animation_type == "r") // if this is a rotation animation
+                    {
+                        glm::mat3 rot_x;
+                        glm::mat3 rot_y;
+                        glm::mat3 rot_z;
+                        
+                        float theta_x = std::stof(animation_info[0]);
+                        float theta_y = std::stof(animation_info[1]);
+                        float theta_z = std::stof(animation_info[2]);
+ 
+                        if (theta_x != 0)
+                        {
+                            rot_x = glm::mat3(glm::vec3(1, 0, 0),
+                                              glm::vec3(0, cos(theta_x), sin(theta_x)),
+                                              glm::vec3(0, -sin(theta_x), cos(theta_x)));     
+                        }
+
+                        if (theta_y != 0)
+                        {
+                            rot_y = glm::mat3(glm::vec3(cos(theta_y), 0, -sin(theta_y)),
+                                              glm::vec3(0, 1, 0),
+                                              glm::vec3(sin(theta_y), 0, cos(theta_y)));
+                        }
+
+                        if (theta_z != 0)
+                        {
+                            rot_z = glm::mat3(glm::vec3(cos(theta_z), sin(theta_z), 0),
+                                              glm::vec3(-sin(theta_z), cos(theta_z), 0),
+                                              glm::vec3(0, 0, 1));
+                        }
+                    }
+
                 }
                 else
                 {
@@ -587,8 +624,8 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
 
         display_obj(animated_stack[i], camera_position);
 
-        std::cout << "Saving ppm" << std::endl;
         savePPM(window, ppm_filename);
+        std::cout << "Saved frame: " << ppm_filename << std::endl;
     }
 }
 
