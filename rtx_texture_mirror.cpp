@@ -8,7 +8,6 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <list>
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -25,14 +24,13 @@ void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
 void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
-Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass);
+Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass, float u, float v);
 // Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction);
 Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction, std::vector<std::vector<Colour>> rgb_values);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 std::vector<ModelTriangle> global_triangles;
-std::map<std::string, std::pair<glm::vec3, float>> global_animation;
 
 std::vector<std::vector<Colour>> readfile(std::string filename, int width, int height, std::vector<std::vector<Colour>> rgb_values)
 {
@@ -241,18 +239,6 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
             if (mode == "o")
             {
                 current_object = splits[1];
-
-                std::string next_line = lines[i + 1];
-                std::vector<std::string> next_split = split(next_line, ' ');
-                std::string next_mode = next_split[0];
-
-                if (next_mode == "a") //if animation info is defined in the next line, parse that information
-                {
-                    glm::vec3 move_direction = glm::vec3(std::stof(next_split[1]), std::stof(next_split[2]), std::stof(next_split[3]));
-                    float move_duration = std::stof(next_split[4]);
-                    global_animation.insert(std::pair<std::string, std::pair<glm::vec3, float>>(current_object, std::pair<glm::vec3, float>(move_direction, move_duration)));
-                }
-
                 continue;
             }
 
@@ -458,7 +444,39 @@ void handleEvent(SDL_Event event)
     else if (event.type == SDL_MOUSEBUTTONDOWN)
         std::cout << "MOUSE CLICKED" << std::endl;
 }
-
+std::vector<ModelTriangle> calculate_vertex_normals(std::vector<ModelTriangle> triangles)
+{
+    for (int i = 0; i < triangles.size(); i++)
+    {
+        if (triangles[i].type == "Icosphere")
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                int count = 1;
+                glm::vec3 current_vertex = triangles[i].vertices[j];
+                glm::vec3 current_vertex_normal = triangles[i].normal;
+                for (int inside = 0; inside < triangles.size(); inside++)
+                {
+                    if ((inside != i) && (triangles[inside].type == "Icosphere"))
+                    {
+                        for (int inner_j = 0; inner_j < 3; inner_j++)
+                        {
+                            glm::vec3 search_vertex = triangles[inside].vertices[inner_j];
+                            if ((search_vertex.x == current_vertex.x) && (search_vertex.y == current_vertex.y) && (search_vertex.z == current_vertex.z))
+                            {
+                                count++;
+                                current_vertex_normal = current_vertex_normal + triangles[inside].normal;
+                            }
+                        }
+                    }
+                }
+                current_vertex_normal = current_vertex_normal / glm::vec3(count, count, count);
+                triangles[i].setVertex_Normals(j, current_vertex_normal);
+            }
+        }
+    }
+    return triangles;
+}
 void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
 {
     int focal = -2;
@@ -506,89 +524,9 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
     }
     rgb_values = readfile(filename, width, height, rgb_values);
     std::cout << "END READING RGB VAL" << std::endl;
+    triangles = calculate_vertex_normals(triangles);
     intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix, rgb_values);
 }
-
-void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_position)
-{
-    if (global_animation.empty())
-    {
-        display_obj(initial_triangles, camera_position);
-        return;
-    }
-
-    std::vector<std::vector<ModelTriangle>> animated_stack;
-    int max_frame = 0;
-
-    for (auto item : global_animation) //detect max frame
-    {
-        float current_frame = item.second.second;
-
-        if (current_frame <= 0)
-        {
-            throw "Frame number cannot be negative!";
-        }
-
-        if (current_frame > max_frame)
-        {
-            max_frame = int(current_frame);
-        }
-    }
-
-    animated_stack.push_back(initial_triangles);
-
-    for (int f = 1; f < max_frame; f++) //animate until max frame number reached
-    {
-        std::vector<ModelTriangle> previous_frame = animated_stack.back(); //get last frame rendered
-        std::vector<ModelTriangle> animated_frame;
-
-        for (ModelTriangle triangle : previous_frame) //apply animation
-        {
-
-            std::string object_name = triangle.type;
-
-            if (global_animation.find(object_name) != global_animation.end())
-            {
-                std::pair<glm::vec3, float> vertex_animation = global_animation[object_name];
-                glm::vec3 animation_step = vertex_animation.first;
-
-                if (f <= vertex_animation.second)
-                {
-                    glm::vec3 v0 = triangle.vertices[0] + animation_step;
-                    glm::vec3 v1 = triangle.vertices[1] + animation_step;
-                    glm::vec3 v2 = triangle.vertices[2] + animation_step;
-
-                    ModelTriangle animated_triangle;
-                    std::memcpy(&animated_triangle, &triangle, sizeof(ModelTriangle));
-                    animated_triangle.setVertices(v0, v1, v2);
-
-                    animated_frame.push_back(animated_triangle);
-                }
-                else
-                {
-                    animated_frame.push_back(triangle); //if animation over, push last one
-                }
-            }
-            else
-            {
-                animated_frame.push_back(triangle);
-            }
-        }
-        animated_stack.push_back(animated_frame);
-    }
-
-    for (int i = 0; i < animated_stack.size(); i++) //export frames
-    {
-        std::cout << "Generating animation frame: " << i << ", size: " << animated_stack[i].size() << std::endl;
-        std::string ppm_filename = "frame_" + std::to_string(i) + ".ppm";
-
-        display_obj(animated_stack[i], camera_position);
-
-        std::cout << "Saving ppm" << std::endl;
-        savePPM(window, ppm_filename);
-    }
-}
-
 float distance_of_vectors(glm::vec3 start, glm::vec3 end)
 {
     return sqrt(pow(end.x - start.x, 2.0) + pow(end.y - start.y, 2.0) + pow(end.z - start.z, 2.0));
@@ -606,6 +544,8 @@ Colour mirror(ModelTriangle triangle, glm::vec3 incoming_ray, std::vector<ModelT
 
     float closest_t = FLT_MAX;
     bool is_intersection = false;
+    float final_u = 0.0;
+    float final_v = 0.0;
     Colour black = Colour(0, 0, 0);
     //loop through every triangle
     for (ModelTriangle triangle : triangles)
@@ -629,6 +569,8 @@ Colour mirror(ModelTriangle triangle, glm::vec3 incoming_ray, std::vector<ModelT
                     {
                         is_intersection = true;
                         closest_t = t;
+                        final_u = u;
+                        final_v = v;
                         closest_triangle = triangle;
                         closest_point = triangle.vertices[0] + (u * e0) + (v * e1);
                     }
@@ -639,7 +581,7 @@ Colour mirror(ModelTriangle triangle, glm::vec3 incoming_ray, std::vector<ModelT
     if (is_intersection)
     {
         std::vector<bool> mirror_shadows = get_all_shadows(light_sources, triangles, closest_point, closest_triangle);
-        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, mirror_shadows, false);
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, mirror_shadows, false, final_u, final_v);
         return output_colour;
     }
     else
@@ -697,9 +639,16 @@ bool shadow_detector(glm::vec3 light_source, std::vector<ModelTriangle> triangle
 
     return is_intersection;
 }
-Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass)
+Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass, float u, float v)
 {
     glm::vec3 triangle_normal = triangle.normal;
+    if (triangle.type == "Icosphere")
+    {
+        glm::vec3 e0 = triangle.vertex_normals[1] - triangle.vertex_normals[0];
+        glm::vec3 e1 = triangle.vertex_normals[2] - triangle.vertex_normals[0];
+        triangle_normal = triangle.vertex_normals[0] + (u * e0) + (v * e1);
+        // triangle_normal = glm::normalize(glm::cross(triangle.vertex_normals[2] - triangle.vertex_normals[0], triangle.vertex_normals[1] - triangle.vertex_normals[0]));
+    }
     glm::vec3 average_vertices = (triangle.vertices[0] + triangle.vertices[1] + triangle.vertices[2]);
     average_vertices = glm::vec3(float(average_vertices.x / 3), float(average_vertices.y / 3), float(average_vertices.z / 3));
     glm::vec3 surface_to_lightsource;
@@ -810,26 +759,12 @@ std::vector<glm::vec3> get_light_points(glm::vec3 middle_light_point)
 }
 Colour get_texture_colour(float u, float v, ModelTriangle triangle, std::vector<std::vector<Colour>> rgb_values)
 {
-    // std::cout << u << " , " << v << std::endl;
-    // std::cout << triangle.textures[0].x << " , " << triangle.textures[0].y << std::endl;
-    // std::cout << triangle.textures[1].x << " , " << triangle.textures[1].y << std::endl;
-    // std::cout << triangle.textures[2].x << " , " << triangle.textures[2].y << std::endl;
 
     glm::vec2 e0 = triangle.textures[1] - triangle.textures[0];
     glm::vec2 e1 = triangle.textures[2] - triangle.textures[0];
     glm::vec2 closest_point = triangle.textures[0] + (u * e0) + (v * e1);
-    // std::cout << closest_point[0] << " , " << closest_point[1] << std::endl;
     int x = round(closest_point[0] * rgb_values.size());
     int y = round(closest_point[1] * rgb_values.size());
-    // std::cout << x << " , " << y << std::endl;
-    // if (x < 0)
-    // {
-    //     x = 0;
-    // }
-    // if (y < 0)
-    // {
-    //     y = 0;
-    // }
     if (x > 299)
     {
         x = 299;
@@ -894,7 +829,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         {
             return mirror(closest_triangle, ray_direction, triangles, closest_point, light_sources, shadows);
         }
-        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, shadows, false);
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, shadows, false, final_u, final_v);
         // Colour output_colour = specular_lighting(closest_triangle, closest_point, cameraPosition, light_sources[0], shadows[0]);
         return output_colour;
         // }
@@ -1010,7 +945,7 @@ int main(int argc, char *argv[])
     glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
 
     //load multiple files, give list as input
-    std::vector<std::string> files{"cornell-box.obj"};
+    std::vector<std::string> files{"cornell-box.obj", "sphere8.obj"};
     global_triangles = load_files(files);
 
     if (true)
@@ -1022,8 +957,10 @@ int main(int argc, char *argv[])
         }
 
         //this is the function that does ray tracing
-        animate(global_triangles, cameraPosition);
+        display_obj(global_triangles, cameraPosition);
         // Need to render the frame at the end, or nothing actually gets shown on the screen !
+        std::cout << "Saving ppm" << std::endl;
+        savePPM(window, "screenshot.ppm");
 
         window.renderFrame();
     }
