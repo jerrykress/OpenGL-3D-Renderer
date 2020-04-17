@@ -394,7 +394,7 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
                       << std::endl;
         }
 
-        std::cout << "Successfully loaded: " << filename << std::endl;
+        std::cout << "Successfully loaded: " << filename << "\n" << std::endl;
     }
 
     return loaded_triangles;
@@ -517,7 +517,7 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
         rgb_values[i].resize(height);
     }
     rgb_values = readfile(filename, width, height, rgb_values);
-    std::cout << "END READING RGB VAL" << std::endl;
+    // std::cout << "END READING RGB VAL" << std::endl;
     intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix, rgb_values);
 }
 
@@ -526,6 +526,7 @@ glm::vec3 centroid(std::string object)
 {
     if (global_centroids.find(object) != global_centroids.end()) //if already exist, return record
     {
+        // std::cout << "Found centroid for object: " << object << std::endl;
         return global_centroids[object];
     }
 
@@ -543,16 +544,20 @@ glm::vec3 centroid(std::string object)
         }   
     }
 
-    remove(object_vertices);
+    // remove(object_vertices);
 
     for (glm::vec3 vertex : object_vertices)
     {
         vertex_sum = vertex_sum + vertex;
     }
 
-    glm::vec3 centre = vertex_sum * float(1 / object_vertices.size());
+    glm::vec3 centre = glm::vec3(vertex_sum.x / object_vertices.size(),
+                                 vertex_sum.y / object_vertices.size(),
+                                 vertex_sum.z / object_vertices.size());
 
     global_centroids[object] = centre;
+
+    std::cout << "Added centroid for object: " << object << " [" << centre.x << "," << centre.y << "," << centre.z << "]" <<std::endl;
 
     return centre;
 }
@@ -692,7 +697,7 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
 
     for (int i = 1; i < animated_stack.size(); i++) //export frames
     {
-        std::cout << "Generating animation frame: " << i << ", size: " << animated_stack[i].size() << std::endl;
+        std::cout << "Generating animation frame: " << i << ", size: " << animated_stack[i].size() << "\n" << std::endl;
         std::string ppm_filename = "frame_" + std::to_string(i) + ".ppm";
 
         display_obj(animated_stack[i], camera_position);
