@@ -9,6 +9,7 @@
 #include <fstream>
 #include <vector>
 #include <list>
+#include <set>
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -33,6 +34,7 @@ DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 std::vector<ModelTriangle> global_triangles;
 std::map<std::string, std::string> global_animation; //object name -> animation info
+std::map<std::string, glm::vec3> global_centroids; //object name -> object centroid
 
 std::vector<std::vector<Colour>> readfile(std::string filename, int width, int height, std::vector<std::vector<Colour>> rgb_values)
 {
@@ -183,6 +185,17 @@ std::vector<std::string> split(std::string str, char delimiter)
     }
 
     return internal;
+}
+
+void remove(std::vector<glm::vec3> &v)
+{
+    auto end = v.end();
+    for (auto it = v.begin(); it != end; ++it)
+    {
+        end = std::remove(it + 1, end, *it);
+    }
+
+    v.erase(end, v.end());
 }
 
 std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
@@ -508,6 +521,81 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
     intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix, rgb_values);
 }
 
+/*Calculate the centroid given an object name*/
+glm::vec3 centroid(std::string object)
+{
+    if (global_centroids.find(object) != global_centroids.end()) //if already exist, return record
+    {
+        return global_centroids[object];
+    }
+
+    std::vector<glm::vec3> object_vertices; //if not, continue to calculate
+    glm::vec3 vertex_sum(0, 0, 0);
+
+    for (ModelTriangle traingle : global_triangles)
+    {
+        if(traingle.type == object)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                object_vertices.push_back(traingle.vertices[i]);
+            }
+        }   
+    }
+
+    remove(object_vertices);
+
+    for (glm::vec3 vertex : object_vertices)
+    {
+        vertex_sum = vertex_sum + vertex;
+    }
+
+    glm::vec3 centre = vertex_sum * float(1 / object_vertices.size());
+
+    global_centroids[object] = centre;
+
+    return centre;
+}
+
+glm::vec3 rotate_vertex(glm::vec3 vertex, float theta_x, float theta_y, float theta_z, std::string object)
+{
+    glm::mat3 rot_x;
+    glm::mat3 rot_y;
+    glm::mat3 rot_z;
+    glm::vec3 wrt_origin = vertex - centroid(object);
+
+    if (theta_x != 0)
+    {
+        rot_x = glm::mat3(glm::vec3(1, 0, 0),
+                          glm::vec3(0, cos(theta_x), sin(theta_x)),
+                          glm::vec3(0, -sin(theta_x), cos(theta_x)));
+
+        wrt_origin = rot_x * wrt_origin;
+    }
+
+    if (theta_y != 0)
+    {
+        rot_y = glm::mat3(glm::vec3(cos(theta_y), 0, -sin(theta_y)),
+                          glm::vec3(0, 1, 0),
+                          glm::vec3(sin(theta_y), 0, cos(theta_y)));
+
+        wrt_origin = rot_y * wrt_origin;
+    }
+
+    if (theta_z != 0)
+    {
+        rot_z = glm::mat3(glm::vec3(cos(theta_z), sin(theta_z), 0),
+                          glm::vec3(-sin(theta_z), cos(theta_z), 0),
+                          glm::vec3(0, 0, 1));
+
+        wrt_origin = rot_z * wrt_origin;
+    }
+
+    glm::vec3 wrt_object = wrt_origin + centroid(object);
+
+    return wrt_object;
+}
+
 void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_position)
 {
     if (global_animation.empty()) //if no animation is found in any object, just render one frame
@@ -572,35 +660,20 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
                     }
 
                     if (animation_type == "r") // if this is a rotation animation
-                    {
-                        glm::mat3 rot_x;
-                        glm::mat3 rot_y;
-                        glm::mat3 rot_z;
-                        
+                    {    
                         float theta_x = std::stof(animation_info[0]);
                         float theta_y = std::stof(animation_info[1]);
                         float theta_z = std::stof(animation_info[2]);
- 
-                        if (theta_x != 0)
-                        {
-                            rot_x = glm::mat3(glm::vec3(1, 0, 0),
-                                              glm::vec3(0, cos(theta_x), sin(theta_x)),
-                                              glm::vec3(0, -sin(theta_x), cos(theta_x)));     
-                        }
 
-                        if (theta_y != 0)
-                        {
-                            rot_y = glm::mat3(glm::vec3(cos(theta_y), 0, -sin(theta_y)),
-                                              glm::vec3(0, 1, 0),
-                                              glm::vec3(sin(theta_y), 0, cos(theta_y)));
-                        }
+                        glm::vec3 v0 = rotate_vertex(triangle.vertices[0], theta_x, theta_y, theta_z, object_name);
+                        glm::vec3 v1 = rotate_vertex(triangle.vertices[1], theta_x, theta_y, theta_z, object_name);
+                        glm::vec3 v2 = rotate_vertex(triangle.vertices[2], theta_x, theta_y, theta_z, object_name);
 
-                        if (theta_z != 0)
-                        {
-                            rot_z = glm::mat3(glm::vec3(cos(theta_z), sin(theta_z), 0),
-                                              glm::vec3(-sin(theta_z), cos(theta_z), 0),
-                                              glm::vec3(0, 0, 1));
-                        }
+                        ModelTriangle animated_triangle;
+                        std::memcpy(&animated_triangle, &triangle, sizeof(ModelTriangle));
+                        animated_triangle.setVertices(v0, v1, v2);
+
+                        animated_frame.push_back(animated_triangle);
                     }
 
                 }
