@@ -529,8 +529,8 @@ void display_obj(std::vector<std::string> filenames, float canvasDepth)
 
     for (int i = 0; i < triangles.size(); i++)
     {
-        // stroke_triangle(triangles[i]);
-        filled_triangle(triangles[i], triangles[i].colour);
+        stroke_triangle(triangles[i]);
+        // filled_triangle(triangles[i], triangles[i].colour);
     }
 }
 
