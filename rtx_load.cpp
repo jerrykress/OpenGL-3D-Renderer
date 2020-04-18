@@ -26,7 +26,7 @@ void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end);
 void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition);
 std::map<int, std::string> load_colour(std::string filename);
 std::map<std::string, Colour> load_mtl(std::string filename);
-Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass);
+Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass, float u, float v);
 // Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction);
 Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangle> triangles, glm::vec3 ray_direction, std::vector<std::vector<Colour>> rgb_values);
 
@@ -34,7 +34,7 @@ DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 Colour white = Colour(255, 255, 255);
 std::vector<ModelTriangle> global_triangles;
 std::map<std::string, std::string> global_animation; //object name -> animation info
-std::map<std::string, glm::vec3> global_centroids; //object name -> object centroid
+std::map<std::string, glm::vec3> global_centroids;   //object name -> object centroid
 
 std::vector<std::vector<Colour>> readfile(std::string filename, int width, int height, std::vector<std::vector<Colour>> rgb_values)
 {
@@ -260,7 +260,7 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
                 std::string next_mode = next_split[0];
 
                 if (next_mode == "a") //if animation info is defined in the next line, parse that information
-                {   
+                {
                     std::string animation_info = next_split[1];
                     global_animation.insert(std::pair<std::string, std::string>(current_object, animation_info));
                 }
@@ -394,10 +394,45 @@ std::vector<ModelTriangle> load_files(std::vector<std::string> filenames)
                       << std::endl;
         }
 
-        std::cout << "Successfully loaded: " << filename << "\n" << std::endl;
+        std::cout << "Successfully loaded: " << filename << "\n"
+                  << std::endl;
     }
 
     return loaded_triangles;
+}
+
+std::vector<ModelTriangle> calculate_vertex_normals(std::vector<ModelTriangle> triangles)
+{
+    for (int i = 0; i < triangles.size(); i++)
+    {
+        if (triangles[i].type == "Icosphere")
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                int count = 1;
+                glm::vec3 current_vertex = triangles[i].vertices[j];
+                glm::vec3 current_vertex_normal = triangles[i].normal;
+                for (int inside = 0; inside < triangles.size(); inside++)
+                {
+                    if ((inside != i) && (triangles[inside].type == "Icosphere"))
+                    {
+                        for (int inner_j = 0; inner_j < 3; inner_j++)
+                        {
+                            glm::vec3 search_vertex = triangles[inside].vertices[inner_j];
+                            if ((search_vertex.x == current_vertex.x) && (search_vertex.y == current_vertex.y) && (search_vertex.z == current_vertex.z))
+                            {
+                                count++;
+                                current_vertex_normal = current_vertex_normal + triangles[inside].normal;
+                            }
+                        }
+                    }
+                }
+                current_vertex_normal = current_vertex_normal / glm::vec3(count, count, count);
+                triangles[i].setVertex_Normals(j, current_vertex_normal);
+            }
+        }
+    }
+    return triangles;
 }
 
 glm::mat3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
@@ -425,35 +460,6 @@ glm::mat3 camera_rotation(int angle_x, int angle_y, glm::vec3 cameraPosition)
     return final_rotation_matrix;
 }
 
-void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
-{
-    float xDiff = end.x - start.x;
-    float yDiff = end.y - start.y;
-    float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
-    if (numberOfSteps > 0)
-    {
-        float xStepSize = xDiff / numberOfSteps;
-        float yStepSize = yDiff / numberOfSteps;
-        for (float i = 0.0; i < numberOfSteps; i++)
-        {
-            float x = start.x + (xStepSize * i);
-            float y = start.y + (yStepSize * i);
-            float red = line_colour.red;
-            float green = line_colour.green;
-            float blue = line_colour.blue;
-            uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-            window.setPixelColour(round(x + (WIDTH / 2)), round(y + (HEIGHT / 1.3)), colour);
-        }
-    }
-    else
-    {
-        float red = line_colour.red;
-        float green = line_colour.green;
-        float blue = line_colour.blue;
-        uint32_t colour = (255 << 24) + (int(red) << 16) + (int(green) << 8) + int(blue);
-        window.setPixelColour(round(start.x + (WIDTH / 2)), round(start.y + (HEIGHT / 1.3)), colour);
-    }
-}
 void handleEvent(SDL_Event event)
 {
     if (event.type == SDL_KEYDOWN)
@@ -516,6 +522,7 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 cameraPosition)
     {
         rgb_values[i].resize(height);
     }
+    triangles = calculate_vertex_normals(triangles);
     rgb_values = readfile(filename, width, height, rgb_values);
     // std::cout << "END READING RGB VAL" << std::endl;
     intersection_on_pixel(cameraPosition, triangles, focal, final_rotation_matrix, rgb_values);
@@ -535,13 +542,13 @@ glm::vec3 centroid(std::string object)
 
     for (ModelTriangle traingle : global_triangles)
     {
-        if(traingle.type == object)
+        if (traingle.type == object)
         {
             for (int i = 0; i < 3; i++)
             {
                 object_vertices.push_back(traingle.vertices[i]);
             }
-        }   
+        }
     }
 
     // remove(object_vertices);
@@ -557,7 +564,7 @@ glm::vec3 centroid(std::string object)
 
     global_centroids[object] = centre;
 
-    std::cout << "Added centroid for object: " << object << " [" << centre.x << "," << centre.y << "," << centre.z << "]" <<std::endl;
+    std::cout << "Added centroid for object: " << object << " [" << centre.x << "," << centre.y << "," << centre.z << "]" << std::endl;
 
     return centre;
 }
@@ -665,7 +672,7 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
                     }
 
                     if (animation_type == "r") // if this is a rotation animation
-                    {    
+                    {
                         float theta_x = std::stof(animation_info[0]);
                         float theta_y = std::stof(animation_info[1]);
                         float theta_z = std::stof(animation_info[2]);
@@ -680,7 +687,6 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
 
                         animated_frame.push_back(animated_triangle);
                     }
-
                 }
                 else
                 {
@@ -697,7 +703,8 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
 
     for (int i = 1; i < animated_stack.size(); i++) //export frames
     {
-        std::cout << "Generating animation frame: " << i << ", size: " << animated_stack[i].size() << "\n" << std::endl;
+        std::cout << "Generating animation frame: " << i << ", size: " << animated_stack[i].size() << "\n"
+                  << std::endl;
         std::string ppm_filename = "frame_" + std::to_string(i) + ".ppm";
 
         display_obj(animated_stack[i], camera_position);
@@ -724,6 +731,8 @@ Colour mirror(ModelTriangle triangle, glm::vec3 incoming_ray, std::vector<ModelT
 
     float closest_t = FLT_MAX;
     bool is_intersection = false;
+    float final_u = 0.0;
+    float final_v = 0.0;
     Colour black = Colour(0, 0, 0);
     //loop through every triangle
     for (ModelTriangle triangle : triangles)
@@ -747,6 +756,8 @@ Colour mirror(ModelTriangle triangle, glm::vec3 incoming_ray, std::vector<ModelT
                     {
                         is_intersection = true;
                         closest_t = t;
+                        final_u = u;
+                        final_v = v;
                         closest_triangle = triangle;
                         closest_point = triangle.vertices[0] + (u * e0) + (v * e1);
                     }
@@ -757,7 +768,7 @@ Colour mirror(ModelTriangle triangle, glm::vec3 incoming_ray, std::vector<ModelT
     if (is_intersection)
     {
         std::vector<bool> mirror_shadows = get_all_shadows(light_sources, triangles, closest_point, closest_triangle);
-        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, mirror_shadows, false);
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, mirror_shadows, false, final_u, final_v);
         return output_colour;
     }
     else
@@ -815,9 +826,16 @@ bool shadow_detector(glm::vec3 light_source, std::vector<ModelTriangle> triangle
 
     return is_intersection;
 }
-Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass)
+Colour proximity_lighting(ModelTriangle triangle, glm::vec3 intersection_point, std::vector<glm::vec3> light_source, std::vector<bool> is_shadow, bool is_glass, float u, float v)
 {
     glm::vec3 triangle_normal = triangle.normal;
+    if (triangle.type == "Icosphere")
+    {
+        glm::vec3 e0 = triangle.vertex_normals[1] - triangle.vertex_normals[0];
+        glm::vec3 e1 = triangle.vertex_normals[2] - triangle.vertex_normals[0];
+        triangle_normal = triangle.vertex_normals[0] + (u * e0) + (v * e1);
+        // triangle_normal = glm::normalize(glm::cross(triangle.vertex_normals[2] - triangle.vertex_normals[0], triangle.vertex_normals[1] - triangle.vertex_normals[0]));
+    }
     glm::vec3 average_vertices = (triangle.vertices[0] + triangle.vertices[1] + triangle.vertices[2]);
     average_vertices = glm::vec3(float(average_vertices.x / 3), float(average_vertices.y / 3), float(average_vertices.z / 3));
     glm::vec3 surface_to_lightsource;
@@ -1012,7 +1030,7 @@ Colour getClosestIntersection(glm::vec3 cameraPosition, std::vector<ModelTriangl
         {
             return mirror(closest_triangle, ray_direction, triangles, closest_point, light_sources, shadows);
         }
-        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, shadows, false);
+        Colour output_colour = proximity_lighting(closest_triangle, closest_point, light_sources, shadows, false, final_u, final_v);
         // Colour output_colour = specular_lighting(closest_triangle, closest_point, cameraPosition, light_sources[0], shadows[0]);
         return output_colour;
         // }
@@ -1128,7 +1146,7 @@ int main(int argc, char *argv[])
     glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
 
     //load multiple files, give list as input
-    std::vector<std::string> files{"cornell-box.obj"};
+    std::vector<std::string> files{"cornell-box.obj", "logo.obj"};
     global_triangles = load_files(files);
 
     if (true)
