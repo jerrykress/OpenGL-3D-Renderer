@@ -1,4 +1,4 @@
-mtllib estrellica.mtl
+mtllib cornell-box.mtl
 
 v 7.889562 1.150329 -2.173651
 v 2.212808 1.150329 -2.230414
@@ -97,7 +97,7 @@ vn 0.004998 0.866108 -0.499832
 vn 0.004998 0.866108 -0.499832
 s off
 g pCylinder1
-usemtl initialShadingGroup
+usemtl Grey
 f 1/11/1 11/22/2 2/12/3
 f 2/12/4 11/22/5 3/13/6
 f 3/13/7 11/22/8 4/14/9

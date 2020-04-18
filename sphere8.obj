@@ -1,7 +1,7 @@
-# Blender v2.82 (sub 7) OBJ File: 'sphere.blend'
-# www.blender.org
+
 mtllib cornell-box.mtl
 o Icosphere
+a 0,0,-0.1,5.0000,s
 usemtl Blue
 
 v -0.787443 0.947964 -1.711953

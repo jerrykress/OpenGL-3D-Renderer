@@ -701,13 +701,14 @@ void animate(std::vector<ModelTriangle> initial_triangles, glm::vec3 camera_posi
         animated_stack.push_back(animated_frame);
     }
 
-    for (int i = 1; i < animated_stack.size(); i++) //export frames
+    for (int i = 1; i < animated_stack.size(); i+=10) //!export frames
     {
         std::cout << "Generating animation frame: " << i << ", size: " << animated_stack[i].size() << "\n"
                   << std::endl;
         std::string ppm_filename = "frame_" + std::to_string(i) + ".ppm";
 
-        display_obj(animated_stack[i], camera_position);
+        glm::vec3 animation_camera = camera_position + glm::vec3(-0.01 * i, 0, 0);
+        display_obj(animated_stack[i], animation_camera);
 
         savePPM(window, ppm_filename);
         std::cout << "Saved frame: " << ppm_filename << std::endl;
@@ -1146,7 +1147,7 @@ int main(int argc, char *argv[])
     glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
 
     //load multiple files, give list as input
-    std::vector<std::string> files{"cornell-box.obj", "logo.obj"};
+    std::vector<std::string> files{"cornell-box.obj", "logo.obj", "sphere.obj"};
     global_triangles = load_files(files);
 
     if (true)
