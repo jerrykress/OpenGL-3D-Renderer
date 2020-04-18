@@ -437,42 +437,6 @@ void handleEvent(SDL_Event event)
         std::cout << "MOUSE CLICKED" << std::endl;
 }
 
-std::vector<glm::vec3> interpolate_3d(glm::vec3 from, glm::vec3 to, int size)
-{
-    std::vector<glm::vec3> l;
-    float t = (1.0 / float(size));
-    float t_iter = 0;
-    for (int i = 0; i < size + 1; i++)
-    {
-        l.push_back((from * glm::vec3(1 - t_iter,
-                                      1 - t_iter,
-                                      1 - t_iter)) +
-                    to * glm::vec3(t_iter, t_iter, t_iter));
-        t_iter = t * i;
-    }
-    return l;
-}
-
-int calculate_gap(CanvasPoint endpoint1, CanvasPoint endpoint2, CanvasPoint intersection)
-{
-    float xDiff = endpoint1.x - intersection.x;
-    float yDiff = endpoint1.y - intersection.y;
-    float numberOfSteps = std::max(abs(xDiff), abs(yDiff));
-
-    float xDiff2 = endpoint2.x - intersection.x;
-    float yDiff2 = endpoint2.y - intersection.y;
-    float numberOfSteps2 = std::max(abs(xDiff2), abs(yDiff2));
-
-    if (numberOfSteps2 > numberOfSteps)
-    {
-        return round(numberOfSteps2);
-    }
-    else
-    {
-        return round(numberOfSteps);
-    }
-}
-
 void draw_line(Colour line_colour, CanvasPoint start, CanvasPoint end)
 {
     float xDiff = end.x - start.x;
@@ -509,112 +473,6 @@ void stroke_triangle(CanvasTriangle triangle)
     draw_line(triangle.colour, triangle.vertices[0], triangle.vertices[1]);
     draw_line(triangle.colour, triangle.vertices[1], triangle.vertices[2]);
     draw_line(triangle.colour, triangle.vertices[2], triangle.vertices[0]);
-}
-
-int indexofSmallestElement(float array[], int size)
-{
-    int index = 0;
-
-    for (int i = 1; i < size; i++)
-    {
-        if (array[i] < array[index])
-            index = i;
-    }
-
-    return index;
-}
-
-int indexofLargestElement(float array[], int size)
-{
-    int index = 0;
-
-    for (int i = 1; i < size; i++)
-    {
-        if (array[i] > array[index])
-            index = i;
-    }
-
-    return index;
-}
-
-void fillBottomFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
-{
-
-    int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
-    glm::vec3 to = glm::vec3(v2.x, v2.y, 1);
-
-    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
-
-    to = glm::vec3(v3.x, v3.y, 1);
-    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
-
-    for (int i = 0; i < gap + 1; i++)
-    {
-        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
-        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
-        draw_line(color, start, end);
-    }
-}
-void fillTopFlatTriangle(CanvasPoint v1, CanvasPoint v2, CanvasPoint v3, Colour color)
-{
-
-    int gap = calculate_gap(v2, v3, v1);
-    glm::vec3 to = glm::vec3(v3.x, v3.y, 1);
-    glm::vec3 from = glm::vec3(v1.x, v1.y, 1);
-
-    std::vector<glm::vec3> answer_left = interpolate_3d(from, to, gap);
-
-    from = glm::vec3(v2.x, v2.y, 1);
-    std::vector<glm::vec3> answer_right = interpolate_3d(from, to, gap);
-
-    for (int i = 0; i < gap + 1; i++)
-    {
-        CanvasPoint start = CanvasPoint(answer_left[i][0], answer_left[i][1]);
-        CanvasPoint end = CanvasPoint(answer_right[i][0], answer_right[i][1]);
-        draw_line(color, start, end);
-    }
-}
-void colored_triangle(CanvasPoint vt1, CanvasPoint vt2, CanvasPoint vt3, Colour color)
-{
-
-    if (vt2.y == vt3.y)
-    {
-        fillBottomFlatTriangle(vt1, vt2, vt3, color);
-    }
-    else if (vt1.y == vt2.y)
-    {
-        fillTopFlatTriangle(vt1, vt2, vt3, color);
-    }
-    else
-    {
-        CanvasPoint v4 = CanvasPoint(
-            (vt1.x + (((vt2.y - vt1.y) / (vt3.y - vt1.y)) * (vt3.x - vt1.x))), vt2.y);
-        fillBottomFlatTriangle(vt1, vt2, v4, color);
-        fillTopFlatTriangle(vt2, v4, vt3, color);
-    }
-}
-
-void filled_triangle(CanvasTriangle triangle, Colour tri_color)
-{
-    //sort the vertices first
-    float y_vertices[] = {triangle.vertices[0].y, triangle.vertices[1].y, triangle.vertices[2].y};
-    int index_smallest = indexofSmallestElement(y_vertices, 3);
-    int index_largest = indexofLargestElement(y_vertices, 3);
-    CanvasPoint top = triangle.vertices[index_smallest];
-    CanvasPoint bottom = triangle.vertices[index_largest];
-    int index_middle = 0;
-    // find middle value
-    for (int i = 0; i < 3; i++)
-    {
-        if ((index_smallest != i) && (index_largest != i))
-        {
-            index_middle = i;
-        }
-    }
-    CanvasPoint middlePoint = triangle.vertices[index_middle];
-    // Colour tri_color = Colour(255, 255, 255);
-    colored_triangle(top, middlePoint, bottom, tri_color);
 }
 
 std::vector<CanvasTriangle> project(std::vector<ModelTriangle> faces, glm::vec3 camera_position)
@@ -662,8 +520,8 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 camera_position
 
     for (int i = 0; i < projected_triangles.size(); i++)
     {
-        // stroke_triangle(projected_triangles[i]);
-        filled_triangle(projected_triangles[i], projected_triangles[i].colour);
+        stroke_triangle(projected_triangles[i]);
+        // filled_triangle(triangles[i], triangles[i].colour);
     }
 }
 
