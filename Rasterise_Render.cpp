@@ -657,8 +657,7 @@ void display_obj(std::vector<ModelTriangle> triangles, glm::vec3 camera_position
         }
     }
 
-    glm::vec3 cameraPosition = glm::vec3(0, 1, 3);
-    std::vector<CanvasTriangle> projected_triangles = project(triangles, cameraPosition);
+    std::vector<CanvasTriangle> projected_triangles = project(triangles, camera_position);
 
     for (int i = 0; i < projected_triangles.size(); i++)
     {
@@ -864,7 +863,7 @@ float distance_of_vectors(glm::vec3 start, glm::vec3 end)
 int main(int argc, char *argv[])
 {
     SDL_Event event;
-    glm::vec3 cameraPosition = glm::vec3(0, 0, -1);
+    glm::vec3 cameraPosition = glm::vec3(0, 1, 3);
 
     //load multiple files, give list as input
     std::vector<std::string> files{"cornell-box.obj", "logo.obj", "sphere.obj"};
