@@ -1,5 +1,5 @@
-# PROJECT_NAME = RTX_Render
-PROJECT_NAME = Wireframe_Render
+PROJECT_NAME = RTX_Render
+# PROJECT_NAME = Wireframe_Render
 # PROJECT_NAME = Rasterise_Render
 
 # Define the names of key files
