@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 PROJECT_NAME = loadobj
+=======
+PROJECT_NAME = RTX_Render
+# PROJECT_NAME = Wireframe_Render
+# PROJECT_NAME = Rasterise_Render
+>>>>>>> 742ab41d1c932e680f8e29c0c83de2edf06e0753
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp

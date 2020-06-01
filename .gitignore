@@ -1,0 +1,6 @@
+
+rtx_load
+
+*.o
+
+*.ppm
