@@ -1,6 +1,6 @@
-# Computer_Graphics
+# Computer Graphics Pair Project
 Graphic Renderer using C++
-This is a part of COMS30115 Computer Graphics module from University of Bristol. 
+This is a part of COMS30115 Computer Graphics module from University of Bristol by jerrykress and dr17549.
 
 This projects involves using GLM to write a renderer engine from scratch. This is by reading from an obj and mlt file to render 
 a 3D image. This project intends to explore both raytracing and rasteriser approach. 
